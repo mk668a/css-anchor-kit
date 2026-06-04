@@ -1,0 +1,930 @@
+:root {
+  --bg: #0a0b10;
+  --bg-soft: #11131c;
+  --bg-elev: #161927;
+  --border: #232838;
+  --border-soft: #1c2030;
+  --text: #e8eaf2;
+  --muted: #99a0b5;
+  --faint: #6c7284;
+  --accent: #8b7dff;
+  --accent-2: #59c2ff;
+  --code-bg: #0e1019;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 84px;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(900px 500px at 80% -10%, rgba(139, 125, 255, 0.16), transparent 60%),
+    radial-gradient(700px 400px at 0% 0%, rgba(89, 194, 255, 0.1), transparent 55%),
+    var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+code {
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  font-size: 0.86em;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-soft);
+  padding: 0.08em 0.4em;
+  border-radius: 0.35rem;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ---------- top nav ---------- */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.5rem;
+  background: rgba(10, 11, 16, 0.72);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.brand-mark {
+  font-size: 1.1rem;
+}
+
+.badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(139, 125, 255, 0.12);
+  border: 1px solid rgba(139, 125, 255, 0.3);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.nav-links a:hover {
+  color: var(--text);
+}
+
+.nav-cta {
+  color: var(--text) !important;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.75rem;
+}
+
+.nav-cta:hover {
+  border-color: var(--accent);
+}
+
+/* ---------- hero ---------- */
+.hero {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 5rem 1.5rem 3rem;
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0 0 1rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5.5vw, 3.4rem);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  font-weight: 720;
+}
+
+.grad {
+  background: linear-gradient(100deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.lede {
+  max-width: 60ch;
+  margin: 1.4rem auto 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.hero-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+.btn-primary,
+.btn-ghost {
+  all: unset;
+  cursor: pointer;
+  padding: 0.65rem 1.2rem;
+  border-radius: 0.6rem;
+  font-size: 0.92rem;
+  font-weight: 550;
+}
+
+.btn-primary {
+  background: linear-gradient(100deg, var(--accent), var(--accent-2));
+  color: #0a0b10;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+.btn-ghost {
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.btn-ghost:hover {
+  border-color: var(--accent);
+}
+
+.hero-install {
+  max-width: 420px;
+  margin: 2.25rem auto 0;
+  text-align: left;
+}
+
+.hero-tip {
+  max-width: none !important;
+  white-space: nowrap;
+}
+
+/* ---------- support banner ---------- */
+.support-banner {
+  max-width: 70ch;
+  margin: 0 auto 2rem;
+  padding: 0.85rem 1.1rem;
+  border: 1px solid #5b3a2c;
+  background: #221610;
+  color: #ffc59b;
+  border-radius: 0.6rem;
+  font-size: 0.9rem;
+}
+
+/* ---------- docs layout ---------- */
+.docs {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 2.5rem;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem 5rem;
+}
+
+.sidebar {
+  position: sticky;
+  top: 84px;
+  align-self: start;
+  height: max-content;
+}
+
+.sidebar-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.sidebar ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.1rem;
+  border-left: 1px solid var(--border-soft);
+}
+
+.sidebar a {
+  display: block;
+  padding: 0.32rem 0.9rem;
+  margin-left: -1px;
+  border-left: 2px solid transparent;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.sidebar a:hover {
+  color: var(--text);
+}
+
+.sidebar a.is-active {
+  color: var(--text);
+  border-left-color: var(--accent);
+  font-weight: 550;
+}
+
+/* ---------- content ---------- */
+.content section {
+  padding: 2rem 0 2.5rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.content section:last-child {
+  border-bottom: none;
+}
+
+.content h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.55rem;
+  letter-spacing: -0.02em;
+}
+
+.content p {
+  color: var(--muted);
+  margin: 0 0 1rem;
+}
+
+.content strong {
+  color: var(--text);
+}
+
+.checks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.checks li {
+  position: relative;
+  padding-left: 1.6rem;
+  color: var(--muted);
+}
+
+.checks li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--accent-2);
+  font-weight: 700;
+}
+
+/* ---------- preview frame ---------- */
+.preview {
+  margin: 1.25rem 0;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background:
+    linear-gradient(0deg, rgba(255, 255, 255, 0.015), rgba(255, 255, 255, 0.015)),
+    repeating-linear-gradient(45deg, transparent, transparent 9px, rgba(255, 255, 255, 0.018) 9px, rgba(255, 255, 255, 0.018) 10px),
+    var(--bg-soft);
+  overflow: hidden;
+}
+
+.preview-stage {
+  min-height: 200px;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+}
+
+/* ---------- buttons / floating surfaces (kit-styled) ---------- */
+.btn {
+  all: unset;
+  cursor: default;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  padding: 0.6rem 1rem;
+  border-radius: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tooltip,
+.card,
+.menu {
+  background: #f3f5fb;
+  color: #11141c;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+}
+
+.tooltip {
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  max-width: 26ch;
+}
+
+.arrow {
+  width: 12px;
+  height: 12px;
+  background: #f3f5fb;
+  rotate: 45deg;
+  border-radius: 2px;
+}
+
+/* The kit places the arrow at the floating element's facing edge (it tracks the
+   offset). Nudge it a few px back toward the anchor so a clean triangle pokes
+   out; the floating element renders later in the DOM and hides the tucked half.
+   The direction is the side that faces the anchor, so it's offset-independent. */
+.arrow-down {
+  transform: translateY(6px);
+}
+
+.arrow-up {
+  transform: translateY(-6px);
+}
+
+.card {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.8rem 1.1rem;
+  border-radius: 0.5rem;
+  text-align: center;
+  color: #0b0d12;
+}
+
+.card strong {
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: #0b0d12;
+}
+
+.card span {
+  color: #3c4458;
+  font-size: 0.76rem;
+}
+
+.menu {
+  margin: 0;
+  list-style: none;
+  padding: 0.35rem;
+  border: none;
+  border-radius: 0.6rem;
+  font-size: 0.9rem;
+}
+
+.menu li {
+  padding: 0.45rem 0.75rem;
+  border-radius: 0.4rem;
+  cursor: default;
+}
+
+.menu li:hover {
+  background: #dde3f3;
+}
+
+/* ---------- playground ---------- */
+.playground {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  grid-template-columns: 230px minmax(0, 1fr);
+}
+
+.controls {
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+}
+
+.controls label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.controls label.check {
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.controls select {
+  background: var(--bg-elev);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  padding: 0.4rem 0.5rem;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.controls input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.controls input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+/* Non-scrolling stage: the anchor sits centered with generous padding so the
+   card stays inside for every placement/offset. `position: relative` makes it
+   the containing block for the absolutely-positioned card. */
+.stage {
+  position: relative;
+  /* contain:paint hard-clips the card to the frame (anchor-positioned elements
+     otherwise escape ordinary overflow), so flipping the card off still keeps
+     any overflow inside the dashed box instead of over the page. */
+  overflow: hidden;
+  contain: paint;
+  min-height: 230px;
+  display: grid;
+  /* anchor sits near the bottom edge: a `bottom` placement overflows downward,
+     so toggling `flip` visibly flips the card above the anchor. */
+  place-items: end center;
+  padding: 28px 150px;
+  border: 1px dashed var(--border);
+  border-radius: 0.6rem;
+  background: var(--code-bg);
+}
+
+/* ---------- code block ---------- */
+.code {
+  margin: 1.25rem 0;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  overflow: hidden;
+  background: var(--code-bg);
+}
+
+.code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.85rem;
+  border-bottom: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.code-lang {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.code-copy {
+  all: unset;
+  cursor: pointer;
+  font-size: 0.74rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  padding: 0.12rem 0.5rem;
+}
+
+.code-copy:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.code pre {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+}
+
+.code pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.82rem;
+  line-height: 1.65;
+  color: #d7dcec;
+}
+
+/* syntax tokens (in-repo highlighter) */
+.tok-comment { color: #6b7390; font-style: italic; }
+.tok-string { color: #9ed29b; }
+.tok-keyword { color: #c78bff; }
+.tok-type { color: #59c2ff; }
+.tok-tag { color: #59c2ff; }
+.tok-fn { color: #f0c277; }
+.tok-prop { color: #84d0ff; }
+.tok-number { color: #f3a96b; }
+.tok-flag { color: #f0c277; }
+
+/* ---------- tables ---------- */
+.table-wrap {
+  overflow-x: auto;
+  margin-top: 1.25rem;
+}
+
+.api-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.api-table th,
+.api-table td {
+  text-align: left;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: top;
+}
+
+.api-table th {
+  color: var(--faint);
+  font-weight: 600;
+  font-size: 0.74rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.api-table td {
+  color: var(--muted);
+}
+
+/* ---------- footer ---------- */
+.site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+  border-top: 1px solid var(--border-soft);
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.site-footer a:hover {
+  color: var(--text);
+}
+
+/* ---------- scrollable stage (hide demo) ---------- */
+.hide-stage {
+  padding: 1.5rem;
+}
+
+.scroll-area {
+  position: relative;
+  overflow: auto;
+  /* contain:paint hard-clips the floating element to the frame; anchor-positioned
+     elements otherwise escape ordinary scroll overflow. */
+  contain: paint;
+  width: 100%;
+  max-width: 340px;
+  height: 220px;
+  margin: 0 auto;
+  border: 1px dashed var(--border);
+  border-radius: 0.6rem;
+  background: var(--code-bg);
+}
+
+.scroll-inner {
+  position: relative;
+  /* Larger than the scrollport on BOTH axes so the canvas scrolls horizontally
+     and vertically — lets you push the anchor toward any edge. */
+  width: 720px;
+  height: 520px;
+  display: grid;
+  place-items: center;
+}
+
+/* ---------- styling demo: surfaces driven by CSS vars ---------- */
+.style-demo {
+  --surface: #f3f5fb;
+  --on: #11141c;
+}
+
+.style-demo.dark {
+  --surface: #1b2030;
+  --on: #e7e9ee;
+}
+
+.style-demo.brand {
+  --surface: linear-gradient(100deg, var(--accent), var(--accent-2));
+  --on: #0a0b10;
+}
+
+.styled-tip {
+  background: var(--surface);
+  color: var(--on);
+  font-weight: 550;
+}
+
+.style-demo .arrow {
+  background: var(--surface);
+}
+
+/* ---------- wide anchor + size panel ---------- */
+.btn-wide {
+  padding: 0.9rem 2.2rem;
+}
+
+.size-panel {
+  min-width: 90px;
+  white-space: nowrap;
+}
+
+/* ---------- interactive playground (Storybook-style) ---------- */
+.pg {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 1.25rem;
+  margin: 1.25rem 0;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: var(--bg-soft);
+}
+
+.pg-controls {
+  display: grid;
+  gap: 0.8rem;
+  align-content: start;
+}
+
+.pg-controls label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.pg-controls label.check {
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pg-controls select {
+  background: var(--bg-elev);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  padding: 0.4rem 0.5rem;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.pg-controls input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.pg-controls input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+.pg-canvas {
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+}
+
+.pg-note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--faint);
+  text-align: center;
+}
+
+.pg-code {
+  grid-column: 1 / -1;
+}
+
+.pg-code .code {
+  margin: 0;
+}
+
+.pg-card {
+  padding: 0.6rem 0.95rem;
+  border-radius: 0.5rem;
+  background: var(--surface, #f3f5fb);
+  color: var(--on, #11141c);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+  font-size: 0.85rem;
+  font-weight: 550;
+  white-space: nowrap;
+}
+
+.arrow-left {
+  transform: translateX(6px);
+}
+
+.arrow-right {
+  transform: translateX(-6px);
+}
+
+.ctrl-hint {
+  margin: -0.2rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--faint);
+}
+
+/* ---------- components playground menu ---------- */
+.cmp-stage {
+  display: grid;
+  place-items: center;
+  height: 260px;
+  contain: layout paint;
+}
+
+.cmp-menu {
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.55);
+  font-size: 0.85rem;
+  min-width: 140px;
+}
+
+.cmp-menu li {
+  padding: 0.4rem 0.7rem;
+  border-radius: 0.35rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.cmp-menu li:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* Match the arrow to the menu surface (the default arrow is light). */
+.cmp-stage .arrow {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+}
+
+/* ---------- flip inside an iframe ---------- */
+.flip-frame-demo {
+  margin: 1.25rem 0;
+}
+
+.flip-frame {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  height: 280px;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: var(--code-bg);
+  box-shadow: inset 0 0 0 1px var(--border-soft);
+}
+
+/* ---------- live flip demo ---------- */
+.flip-demo {
+  margin: 1.25rem 0;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: var(--bg-soft);
+}
+
+.flip-demo-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+}
+
+.flip-demo-head .btn-ghost {
+  flex: none;
+  white-space: nowrap;
+}
+
+.flip-demo-slider {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.flip-demo-slider input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.flip-badge {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  font-size: 0.85rem;
+  color: var(--muted);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.flip-badge.is-flipped {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-elev));
+  color: var(--text);
+}
+
+.flip-anchor {
+  z-index: 50;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: linear-gradient(100deg, var(--accent), var(--accent-2));
+  color: #0a0b10;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.flip-float {
+  z-index: 49;
+  width: 180px;
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.55rem;
+  background: #11141c;
+  color: #e8eaf2;
+  border: 1px solid var(--accent);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.55);
+  font-size: 0.82rem;
+}
+
+/* props sub-headings */
+.content h3 {
+  margin: 1.75rem 0 0.5rem;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.content h4 {
+  margin: 1.5rem 0 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+@media (max-width: 820px) {
+  .pg {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 820px) {
+  .docs {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    display: none;
+  }
+  .playground {
+    grid-template-columns: 1fr;
+  }
+  .nav-links a:not(.nav-cta) {
+    display: none;
+  }
+}

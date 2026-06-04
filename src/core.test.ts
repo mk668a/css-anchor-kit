@@ -82,9 +82,18 @@ describe('buildAnchorStyles', () => {
   })
 
   it('omits margin when offset is 0', () => {
-    const { floating } = buildAnchorStyles(NAME, { offset: 0 })
+    const { floating, arrow } = buildAnchorStyles(NAME, { offset: 0 })
     expect(floating.marginTop).toBeUndefined()
     expect(floating.margin).toBe('0')
+    expect(arrow.marginTop).toBeUndefined()
+    expect(arrow.margin).toBe('0')
+  })
+
+  it('applies the same offset to the arrow so it tracks the floating edge', () => {
+    expect(buildAnchorStyles(NAME, { placement: 'top', offset: 8 }).arrow.marginBottom).toBe('8px')
+    expect(buildAnchorStyles(NAME, { placement: 'bottom', offset: 8 }).arrow.marginTop).toBe('8px')
+    expect(buildAnchorStyles(NAME, { placement: 'right', offset: 12 }).arrow.marginLeft).toBe('12px')
+    expect(buildAnchorStyles(NAME, { placement: 'left', offset: 12 }).arrow.marginRight).toBe('12px')
   })
 
   it('disables flip and toggles hide', () => {

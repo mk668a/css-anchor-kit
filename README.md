@@ -2,6 +2,8 @@
 
 **Tooltips and popovers, positioned by the browser — not by JavaScript.**
 
+▶ **[Live demo &amp; interactive docs →](https://css-anchor-kit.netlify.app)**
+
 A tiny headless React hook for floating elements (tooltips, popovers, dropdowns, menus) built entirely on native [CSS Anchor Positioning](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_anchor_positioning). Same ergonomics as [floating-ui](https://floating-ui.com) — `placement`, `offset`, `flip`, arrows — but **no measurement loop, no `requestAnimationFrame`, no reflow on scroll**. The browser does the positioning.
 
 ```tsx

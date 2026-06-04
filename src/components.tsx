@@ -63,6 +63,17 @@ type PolymorphicProps = {
   [key: string]: any
 }
 
+/** Merge a consumer ref with the kit's internal callback ref (used for boundary flip). */
+function mergeRefs(...refs: Array<Ref<unknown> | undefined>): Ref<unknown> {
+  return (node: unknown) => {
+    for (const ref of refs) {
+      if (!ref) continue
+      if (typeof ref === 'function') ref(node)
+      else (ref as { current: unknown }).current = node
+    }
+  }
+}
+
 /** Build a polymorphic component that spreads one slot's props (merging style). */
 function slot(slotKey: 'anchorProps' | 'floatingProps' | 'arrowProps', displayName: string) {
   const Component = forwardRef<unknown, PolymorphicProps>(function Slot(
@@ -71,9 +82,12 @@ function slot(slotKey: 'anchorProps' | 'floatingProps' | 'arrowProps', displayNa
   ) {
     const ctx = useAnchorContext(displayName)
     const props = ctx[slotKey]
+    // anchorProps/floatingProps carry an internal ref for boundary-scoped flip;
+    // merge it with the consumer's ref so both fire. arrowProps has none.
+    const internalRef = (props as { ref?: Ref<unknown> }).ref
     const Tag: ElementType = as ?? 'div'
     return createElement(Tag, {
-      ref: ref as Ref<unknown>,
+      ref: mergeRefs(ref as Ref<unknown>, internalRef),
       ...rest,
       // The user's own style is kept, but the kit's positioning props come last
       // so they stay authoritative.

@@ -1,6 +1,6 @@
 {
   "name": "css-anchor-kit",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Native CSS Anchor Positioning for React — floating-ui ergonomics, zero runtime positioning JS.",
   "type": "module",
   "license": "MIT",

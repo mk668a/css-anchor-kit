@@ -1,0 +1,15 @@
+# Netlify config for the css-anchor-kit docs/example site.
+# Set the site's "Base directory" to `examples/react` in the Netlify UI;
+# everything below is then resolved relative to that base.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Single-page docs (hash anchors only) — send any stray path to index.html.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

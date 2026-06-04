@@ -145,7 +145,12 @@ export function buildAnchorStyles(
   }
 
   if (offset) {
-    floating[`margin${capitalize(mainInset)}`] = `${offset}px`
+    // Apply the gap to BOTH the floating element and the arrow so the arrow
+    // tracks the floating element's facing edge. Without this the arrow stays
+    // pinned to the anchor and visibly detaches as the offset grows.
+    const marginProp = `margin${capitalize(mainInset)}`
+    floating[marginProp] = `${offset}px`
+    arrow[marginProp] = `${offset}px`
   }
 
   const selfProp = blockAxis ? 'justifySelf' : 'alignSelf'

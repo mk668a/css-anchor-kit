@@ -1,0 +1,23 @@
+{
+  "name": "css-anchor-kit-react-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Runnable React demo for css-anchor-kit (useAnchor hook + Anchored/Anchor/Floating/Arrow).",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.1",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  }
+}
