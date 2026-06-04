@@ -1,3 +1,9 @@
+<p align="center">
+  <a href="https://css-anchor-kit.netlify.app">
+    <img src="https://raw.githubusercontent.com/mk668a/css-anchor-kit/main/image.jpg" alt="css-anchor-kit — Floating UI, positioned by the browser, not JavaScript" width="100%">
+  </a>
+</p>
+
 # css-anchor-kit
 
 **Tooltips and popovers, positioned by the browser — not by JavaScript.**
