@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>css-anchor-kit — native CSS anchor positioning demo</title>
+    <style>
+      :root { font-family: ui-sans-serif, system-ui, sans-serif; }
+      body {
+        margin: 0;
+        min-height: 200vh; /* room to scroll so flip + hide are visible */
+        display: grid;
+        place-items: center;
+        background: #0b0d12;
+        color: #e7e9ee;
+      }
+      .stage { display: grid; gap: 4rem; padding: 40vh 0; }
+      .row { display: flex; gap: 2rem; align-items: center; justify-content: center; }
+      button {
+        all: unset;
+        cursor: default;
+        background: #1b2030;
+        border: 1px solid #2c3650;
+        padding: 0.6rem 1rem;
+        border-radius: 0.6rem;
+      }
+      .unsupported { display: none; color: #ff9b9b; max-width: 32ch; text-align: center; }
+
+      /* --- this is exactly the CSS css-anchor-kit emits as inline styles --- */
+      .anchor-top    { anchor-name: --a-top; }
+      .anchor-bottom { anchor-name: --a-bottom; }
+      .anchor-right  { anchor-name: --a-right; }
+      .anchor-start  { anchor-name: --a-start; }
+
+      .pop {
+        position: fixed;
+        margin: 0;
+        background: #eef1f8;
+        color: #11141c;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.5rem;
+        font-size: 0.9rem;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.45);
+        /* native flip when it would overflow the viewport */
+        position-try-fallbacks: flip-block, flip-inline;
+      }
+      .arrow {
+        position: fixed;
+        margin: 0;
+        width: 10px; height: 10px;
+        background: #eef1f8;
+        rotate: 45deg;
+        border-radius: 2px;
+      }
+
+      /* top, centered, 8px gap */
+      .pop.top    { position-anchor: --a-top;    bottom: anchor(top);    justify-self: anchor-center; margin-bottom: 8px; }
+      .arrow.top  { position-anchor: --a-top;    bottom: anchor(top);    justify-self: anchor-center; margin-bottom: 3px; }
+      /* bottom, centered */
+      .pop.bottom { position-anchor: --a-bottom; top: anchor(bottom);    justify-self: anchor-center; margin-top: 8px; }
+      .arrow.bottom { position-anchor: --a-bottom; top: anchor(bottom);  justify-self: anchor-center; margin-top: 3px; }
+      /* right, centered */
+      .pop.right  { position-anchor: --a-right;  left: anchor(right);    align-self: anchor-center;   margin-left: 8px; }
+      /* bottom-start (left edges aligned) */
+      .pop.start  { position-anchor: --a-start;  top: anchor(bottom);    left: anchor(left);          margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <p class="unsupported" id="warn">
+      Your browser doesn't support CSS Anchor Positioning yet — load the
+      <code>@oddbird/css-anchor-positioning</code> polyfill to see this demo.
+    </p>
+
+    <div class="stage">
+      <div class="row">
+        <button class="anchor-top">top</button>
+        <div class="arrow top"></div>
+        <div class="pop top">Type less. Think more.</div>
+
+        <button class="anchor-bottom">bottom</button>
+        <div class="arrow bottom"></div>
+        <div class="pop bottom">positioned by the browser</div>
+      </div>
+      <div class="row">
+        <button class="anchor-right">right</button>
+        <div class="pop right">zero JS · zero reflow</div>
+
+        <button class="anchor-start">bottom-start</button>
+        <div class="pop start">left edges aligned</div>
+      </div>
+    </div>
+
+    <script>
+      // The kit's `supported` flag, in one line:
+      const ok = window.CSS && CSS.supports('anchor-name: --x')
+      if (!ok) document.getElementById('warn').style.display = 'block'
+    </script>
+  </body>
+</html>

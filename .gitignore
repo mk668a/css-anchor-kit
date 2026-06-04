@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+*.log
+.playwright-mcp
+
+# local-only working docs (never publish)
+PLAN.md
+CLAUDE.md

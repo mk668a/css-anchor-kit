@@ -1,0 +1,78 @@
+{
+  "name": "css-anchor-kit",
+  "version": "1.0.0",
+  "description": "Native CSS Anchor Positioning for React — floating-ui ergonomics, zero runtime positioning JS.",
+  "type": "module",
+  "license": "MIT",
+  "author": "mk668a",
+  "homepage": "https://github.com/mk668a/css-anchor-kit",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mk668a/css-anchor-kit.git"
+  },
+  "keywords": [
+    "css-anchor-positioning",
+    "anchor-positioning",
+    "floating-ui",
+    "popover",
+    "tooltip",
+    "dropdown",
+    "react",
+    "headless",
+    "positioning"
+  ],
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "css-anchor-kit": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js",
+      "require": "./dist/core.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.1.0",
+    "@types/jscodeshift": "^17.3.0",
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.0.1",
+    "@types/react-dom": "^19.0.2",
+    "happy-dom": "^15.11.7",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "jscodeshift": "^17.3.0"
+  }
+}

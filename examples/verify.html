@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>css-anchor-kit — browser verification harness</title>
+    <style>
+      body { margin: 0; font-family: system-ui, sans-serif; }
+      .pair { position: relative; }
+      button.anchor {
+        position: absolute;
+        width: 80px; height: 30px;
+        background: #ddd; border: 1px solid #999;
+      }
+      .float {
+        background: #cde; border: 1px solid #36c;
+        padding: 6px 10px; width: 60px; box-sizing: border-box;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import { buildAnchorStyles, isAnchorPositioningSupported } from '../dist/core.js'
+
+      const PLACEMENTS = [
+        'top', 'top-start', 'top-end',
+        'bottom', 'bottom-start', 'bottom-end',
+        'left', 'left-start', 'left-end',
+        'right', 'right-start', 'right-end',
+      ]
+
+      const root = document.getElementById('root')
+      const pairs = []
+
+      // Lay anchors out on a wide, tall grid with plenty of room so the
+      // primary side never needs to flip. flip is disabled for determinism.
+      PLACEMENTS.forEach((placement, i) => {
+        const col = i % 3
+        const rowN = Math.floor(i / 3)
+        const x = 200 + col * 320
+        const y = 200 + rowN * 260
+
+        const wrap = document.createElement('div')
+        wrap.className = 'pair'
+
+        const anchorName = `--cak-v${i}`
+        const btn = document.createElement('button')
+        btn.className = 'anchor'
+        btn.textContent = placement
+        btn.style.left = x + 'px'
+        btn.style.top = y + 'px'
+
+        const float = document.createElement('div')
+        float.className = 'float'
+        float.textContent = placement
+
+        const { anchor, floating } = buildAnchorStyles(anchorName, {
+          placement,
+          offset: 8,
+          flip: false,
+        })
+        Object.assign(btn.style, anchor)
+        Object.assign(float.style, floating)
+
+        wrap.append(btn, float)
+        root.append(wrap)
+        pairs.push({ placement, btn, float })
+      })
+
+      const raf = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+
+      // Assert geometry once layout settles. Each anchor is scrolled into view
+      // first: `position: fixed` + `anchor-center` is viewport-relative, so an
+      // off-screen anchor would clamp the floating element (expected CSS
+      // behavior — tooltips are only shown when their anchor is visible).
+      async function check() {
+        const T = 2 // px tolerance
+        const results = []
+        for (const { placement, btn, float } of pairs) {
+          btn.scrollIntoView({ block: 'center', inline: 'center' })
+          await raf()
+          const a = btn.getBoundingClientRect()
+          const f = float.getBoundingClientRect()
+          const [side, align] = placement.split('-')
+          const fails = []
+
+          // primary side (8px gap)
+          if (side === 'top' && !(f.bottom <= a.top + T)) fails.push(`not above (f.bottom=${f.bottom} a.top=${a.top})`)
+          if (side === 'bottom' && !(f.top >= a.bottom - T)) fails.push(`not below (f.top=${f.top} a.bottom=${a.bottom})`)
+          if (side === 'left' && !(f.right <= a.left + T)) fails.push(`not left (f.right=${f.right} a.left=${a.left})`)
+          if (side === 'right' && !(f.left >= a.right - T)) fails.push(`not right (f.left=${f.left} a.right=${a.right})`)
+
+          // gap ~8px on the primary axis
+          const gap =
+            side === 'top' ? a.top - f.bottom :
+            side === 'bottom' ? f.top - a.bottom :
+            side === 'left' ? a.left - f.right :
+            f.left - a.right
+          if (Math.abs(gap - 8) > T) fails.push(`gap=${gap.toFixed(1)} expected ~8`)
+
+          // cross-axis alignment
+          const blockAxis = side === 'top' || side === 'bottom'
+          if (!align) {
+            // centered
+            const ac = blockAxis ? (a.left + a.right) / 2 : (a.top + a.bottom) / 2
+            const fc = blockAxis ? (f.left + f.right) / 2 : (f.top + f.bottom) / 2
+            if (Math.abs(ac - fc) > T) fails.push(`not centered (Δ=${(ac - fc).toFixed(1)})`)
+          } else if (blockAxis) {
+            if (align === 'start' && Math.abs(f.left - a.left) > T) fails.push(`start edge Δ=${(f.left - a.left).toFixed(1)}`)
+            if (align === 'end' && Math.abs(f.right - a.right) > T) fails.push(`end edge Δ=${(f.right - a.right).toFixed(1)}`)
+          } else {
+            if (align === 'start' && Math.abs(f.top - a.top) > T) fails.push(`start edge Δ=${(f.top - a.top).toFixed(1)}`)
+            if (align === 'end' && Math.abs(f.bottom - a.bottom) > T) fails.push(`end edge Δ=${(f.bottom - a.bottom).toFixed(1)}`)
+          }
+
+          results.push({ placement, ok: fails.length === 0, fails })
+        }
+
+        window.__verify = {
+          supported: isAnchorPositioningSupported(),
+          results,
+          passed: results.filter((r) => r.ok).length,
+          total: results.length,
+        }
+        window.__verifyDone = true
+      }
+
+      check()
+    </script>
+  </body>
+</html>
