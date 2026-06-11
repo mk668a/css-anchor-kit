@@ -384,6 +384,17 @@ a {
   color: #0b0d12;
 }
 
+/* Classic popover gotcha: an unconditional `display` on a [popover] element
+   overrides the UA's `[popover]:not(:popover-open) { display: none }` and the
+   closed popover stays visible. Scope the layout display to the open state. */
+.card[popover] {
+  display: none;
+}
+
+.card[popover]:popover-open {
+  display: grid;
+}
+
 .card strong {
   font-size: 0.95rem;
   font-weight: 650;

@@ -117,6 +117,57 @@ import { Anchored, Anchor, Floating, Arrow } from 'css-anchor-kit'
 
 `<Anchored>` runs `useAnchor` and shares it via context; `<Anchor>`/`<Floating>`/`<Arrow>` are polymorphic (`as` prop, default `div`) and spread the matching props. The hook stays the primary API — components are pure DX sugar and tree-shake away if unused.
 
+### Popover, Tooltip, Menu — the interaction half
+
+`useAnchor` answers *where*; these components answer *when* — and they outsource that to the platform too, via the native [Popover API](https://developer.mozilla.org/en-US/docs/Web/API/Popover_API) (Baseline 2025). Top layer (no portal, no `z-index`), light dismiss, Escape, and focus restore all come from the browser, not from event-listener JS:
+
+```tsx
+import { Popover, PopoverTrigger, PopoverContent, Arrow } from 'css-anchor-kit'
+
+<Popover placement="bottom-start" offset={6}>
+  <PopoverTrigger>Open</PopoverTrigger>
+  <PopoverContent className="card">
+    Click outside or press Esc — the browser closes it.
+    <Arrow className="arrow" />
+  </PopoverContent>
+</Popover>
+```
+
+Three flavors share one engine:
+
+| | visibility driven by | `popover` mode | extras |
+|---|---|---|---|
+| `Popover` | trigger click (native invoker) | `auto` — light dismiss | controlled via `open` / `onOpenChange`, `defaultOpen` |
+| `Tooltip` | hover (`openDelay`/`closeDelay`) + focus | `manual` | `role="tooltip"`, `aria-describedby`, Escape to close |
+| `Menu` | trigger click / ArrowDown | `auto` | `role="menu"`, ArrowUp/Down/Home/End navigation, `<MenuItem>` |
+
+```tsx
+<Tooltip placement="top" offset={8} openDelay={150}>
+  <TooltipTrigger>Hover me</TooltipTrigger>
+  <TooltipContent className="tip">Type less. Think more.</TooltipContent>
+</Tooltip>
+
+<Menu placement="bottom-end">
+  <MenuTrigger>Actions</MenuTrigger>
+  <MenuContent className="menu">
+    <MenuItem onClick={rename}>Rename</MenuItem>
+    <MenuItem onClick={remove}>Delete</MenuItem>
+  </MenuContent>
+</Menu>
+```
+
+Still headless: no styles, no classes, every prop forwarded, `as` to change the tag. All root props extend `useAnchor`'s options, so `placement` / `offset` / `flip` / `size` work unchanged. State is uncontrolled by default; pass `open` + `onOpenChange` to control it (light dismiss and Escape report through `onOpenChange` like any other close).
+
+If the Popover API is missing (older browsers, or before hydration), the components degrade gracefully: content is hidden with `display: none` and outside-click/Escape handling falls back to a small JS shim — but it's never *rendered inline* into the page flow. Detect support with `isPopoverSupported()`.
+
+> **The classic popover-CSS gotcha**: visibility belongs to the browser, so the kit never touches `display` on a native popover — which means an *unconditional* `display` in your own CSS (e.g. `.card { display: grid }`) overrides the UA's `[popover]:not(:popover-open) { display: none }` and the closed popover stays visible. Scope layout display to the open state:
+>
+> ```css
+> .card:popover-open { display: grid; }   /* not: .card { display: grid } */
+> ```
+
+
+
 ### Arrow
 
 The arrow is a sibling element anchored to the **same** anchor, so it stays centered on the anchor even when the floating box is edge-aligned or flips — no JS middleware:
@@ -207,6 +258,7 @@ Everything else floating-ui is used for in the 90% tooltip/popover/menu case —
 - [x] logical-property / RTL placements
 - [x] headless `<Anchor>` / `<Floating>` / `<Arrow>` components
 - [x] `npx css-anchor-kit migrate` codemod (floating-ui → css-anchor-kit)
+- [x] `<Popover>` / `<Tooltip>` / `<Menu>` on the native Popover API (top layer, light dismiss — no portal JS)
 - [ ] discrete `shift` approximation via generated `@position-try` fallback positions (exploration; continuous shift is not expressible in pure CSS)
 
 ## License

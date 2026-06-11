@@ -7,6 +7,21 @@ export type { Rect, Size } from './flipWithin'
 export { Anchored, Anchor, Floating, Arrow, useAnchored } from './components'
 export type { AnchoredProps } from './components'
 
+export {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  Menu,
+  MenuTrigger,
+  MenuContent,
+  MenuItem,
+  isPopoverSupported,
+} from './popover'
+export type { PopoverProps, TooltipProps, MenuProps, MenuItemProps } from './popover'
+
 export { buildAnchorStyles, isAnchorPositioningSupported } from './core'
 export type {
   AnchorOptions,

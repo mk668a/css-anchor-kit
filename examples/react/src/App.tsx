@@ -7,6 +7,7 @@ import { InteractivePlayground } from './demos/InteractivePlayground'
 import { ComponentsPlayground } from './demos/ComponentsPlayground'
 import { FlipDemo } from './demos/FlipDemo'
 import { FlipFrameDemo } from './demos/FlipFrameDemo'
+import { PopoverKitDemo } from './demos/PopoverKitDemo'
 
 const REPO = 'https://github.com/mk668a/css-anchor-kit'
 
@@ -16,6 +17,7 @@ const SECTIONS: NavItem[] = [
   { id: 'props', label: 'Props' },
   { id: 'quick-start', label: 'Install & quick start' },
   { id: 'components', label: 'Components & popover' },
+  { id: 'popover-kit', label: 'Popover · Tooltip · Menu' },
   { id: 'support', label: 'Browser support' },
 ]
 
@@ -33,6 +35,19 @@ const { anchor, floating, arrow } = buildAnchorStyles('--menu', {
 
 const MIGRATION_CODE = `# Codemod rewrites the mechanical 80% of a floating-ui setup.
 npx css-anchor-kit migrate src/`
+
+const POPOVER_KIT_CODE = `import { Popover, PopoverTrigger, PopoverContent } from 'css-anchor-kit'
+
+<Popover placement="bottom-start" offset={10}>
+  <PopoverTrigger className="btn">Open</PopoverTrigger>
+  <PopoverContent className="card">
+    Click outside or press Esc — the browser closes it.
+  </PopoverContent>
+</Popover>
+
+// Same engine, two more flavors:
+<Tooltip openDelay={150}>…</Tooltip>   // hover/focus, role="tooltip"
+<Menu>…<MenuItem onClick={…} />…</Menu> // role="menu", arrow-key navigation`
 
 const SUPPORT_CODE = `import { isAnchorPositioningSupported } from 'css-anchor-kit/core'
 
@@ -356,6 +371,27 @@ export function App() {
               Popover API and the menu&apos;s width can track its trigger.
             </p>
             <ComponentsPlayground />
+          </section>
+
+          <section id="popover-kit">
+            <h2>Popover · Tooltip · Menu</h2>
+            <p>
+              <code>useAnchor</code> answers <em>where</em>; these components
+              answer <em>when</em> — and outsource that to the platform too, via
+              the native Popover API. Top layer, light dismiss, Escape and focus
+              restore all come from the browser. Still headless: every prop
+              forwarded, styling is yours.
+            </p>
+            <PopoverKitDemo />
+            <CodeBlock code={POPOVER_KIT_CODE} lang="tsx" />
+            <p className="hint">
+              All three roots take the same options as <code>useAnchor</code>{' '}
+              (<code>placement</code>, <code>offset</code>, <code>flip</code>,{' '}
+              <code>size</code>…). State is uncontrolled by default — pass{' '}
+              <code>open</code> + <code>onOpenChange</code> to control it; light
+              dismiss and Escape report through <code>onOpenChange</code> like
+              any other close.
+            </p>
           </section>
 
           <section id="support">

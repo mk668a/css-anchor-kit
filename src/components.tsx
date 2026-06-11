@@ -39,6 +39,21 @@ function useAnchorContext(component: string): UseAnchorReturn {
   return ctx
 }
 
+/**
+ * @internal Share an already-created {@link useAnchor} result, so the popover
+ * layer (`<Popover>`/`<Tooltip>`/`<Menu>`) can host `<Anchor>`/`<Floating>`/
+ * `<Arrow>` without running the hook twice.
+ */
+export function AnchorProvider({
+  value,
+  children,
+}: {
+  value: UseAnchorReturn
+  children?: ReactNode
+}): ReactNode {
+  return createElement(AnchorContext.Provider, { value }, children)
+}
+
 export interface AnchoredProps extends AnchorOptions {
   children: ReactNode
 }
@@ -54,7 +69,7 @@ export function useAnchored(): UseAnchorReturn {
   return useAnchorContext('useAnchored')
 }
 
-type PolymorphicProps = {
+export type PolymorphicProps = {
   /** The element/component to render. Default `'div'`. */
   as?: ElementType
   style?: CSSProperties
@@ -64,7 +79,7 @@ type PolymorphicProps = {
 }
 
 /** Merge a consumer ref with the kit's internal callback ref (used for boundary flip). */
-function mergeRefs(...refs: Array<Ref<unknown> | undefined>): Ref<unknown> {
+export function mergeRefs(...refs: Array<Ref<unknown> | undefined>): Ref<unknown> {
   return (node: unknown) => {
     for (const ref of refs) {
       if (!ref) continue
