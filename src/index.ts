@@ -4,7 +4,7 @@ export type { UseAnchorReturn, UseAnchorOptions, Boundary } from './useAnchor'
 export { resolveFlip, oppositePlacement } from './flipWithin'
 export type { Rect, Size } from './flipWithin'
 
-export { Anchored, Anchor, Floating, Arrow, useAnchored } from './components'
+export { Anchored, Anchor, Floating, Arrow, SafeArea, useAnchored } from './components'
 export type { AnchoredProps } from './components'
 
 export {

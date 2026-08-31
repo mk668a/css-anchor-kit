@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { render } from '@testing-library/react'
-import { Anchored, Anchor, Floating, Arrow } from './components'
+import { Anchored, Anchor, Floating, Arrow, SafeArea } from './components'
 
 describe('headless components', () => {
   it('renders anchor/floating/arrow with the positioning styles applied', () => {
@@ -49,6 +49,36 @@ describe('headless components', () => {
     const f = container.querySelector('[data-testid="f"]') as HTMLElement
     expect(f.style.color).toBe('red') // user style kept
     expect(f.style.position).toBe('fixed') // positioning authoritative
+  })
+
+  it('renders <SafeArea> inside <Floating> when the option is on', () => {
+    const { container } = render(
+      <Anchored placement="right" offset={12} safeArea>
+        <Anchor as="button">Trigger</Anchor>
+        <Floating data-testid="f">
+          <SafeArea data-testid="safe" />
+          Menu
+        </Floating>
+      </Anchored>,
+    )
+    const floating = container.querySelector('[data-testid="f"]') as HTMLElement
+    const safe = container.querySelector('[data-testid="safe"]') as HTMLElement
+    // A child, not a sibling: only inside does it stay reachable when the
+    // floating element is in the top layer.
+    expect(safe.parentElement).toBe(floating)
+    expect((floating.style as any).anchorName).toMatch(/^--cak-.*-floating$/)
+    expect(safe.style.position).toBe('fixed')
+  })
+
+  it('tells you to enable `safeArea` when <SafeArea> has nothing to span', () => {
+    expect(() =>
+      render(
+        <Anchored>
+          <Anchor>a</Anchor>
+          <Floating><SafeArea /></Floating>
+        </Anchored>,
+      ),
+    ).toThrow(/needs the `safeArea` option/)
   })
 
   it('throws if a slot is used outside <Anchored>', () => {

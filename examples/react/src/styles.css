@@ -939,3 +939,63 @@ a {
     display: none;
   }
 }
+
+/* ---------- safe area ---------- */
+.safe-area-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.safe-area-bar .check {
+  display: inline-grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.safe-area-bar input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+.safe-area-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.safe-area-stage {
+  display: grid;
+  /* Roomy enough that an open card never crowds the other row. */
+  gap: 3.5rem;
+  padding: 2.25rem 1.5rem;
+}
+
+.safe-area-row {
+  display: grid;
+  grid-template-columns: 8.5rem auto;
+  align-items: center;
+  gap: 0.9rem;
+  justify-content: start;
+}
+
+.safe-area-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* The kit gives the safe area its position; everything visual is ours — and by
+   default that's nothing at all. `.is-visible` is the demo's X-ray mode. */
+.safe-area.is-visible {
+  background: rgba(126, 168, 255, 0.22);
+  outline: 1px dashed rgba(126, 168, 255, 0.7);
+}
+
+.hover-card {
+  max-width: 30ch;
+  text-align: left;
+}

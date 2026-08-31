@@ -201,6 +201,9 @@ function Root({
   useEffect(() => {
     delaysRef.current = { open: openDelay, close: closeDelay }
   })
+  // Mirror assigned during render, like the ones above — `schedule` is stable.
+  const safeAreaRef = useRef(anchor.safeArea)
+  safeAreaRef.current = anchor.safeArea
   const schedule = useCallback(
     (next: boolean) => {
       if (timerRef.current) {
@@ -208,7 +211,12 @@ function Root({
         timerRef.current = null
       }
       const delay = next ? delaysRef.current.open : delaysRef.current.close
-      if (delay > 0) {
+      // A safe area is only reachable if the close waits for the pointer to get
+      // there: the browser fires `pointerleave` on the trigger *before*
+      // `pointerenter` on the corridor, so a synchronous close would hide the
+      // corridor before it could cancel anything. One task is enough — boundary
+      // events all fire while dispatching the same pointermove.
+      if (delay > 0 || (!next && safeAreaRef.current)) {
         timerRef.current = setTimeout(() => {
           timerRef.current = null
           requestOpen(next)

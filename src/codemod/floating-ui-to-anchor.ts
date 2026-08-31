@@ -45,6 +45,13 @@ const UNSUPPORTED_MIDDLEWARE: Record<string, string> = {
 
 const TODO = (msg: string) => ` TODO(css-anchor-kit): ${msg}`
 
+/**
+ * Interaction hooks are out of scope, but `safePolygon()` has a direct
+ * counterpart in the kit, so point at it rather than leaving it silent.
+ */
+const SAFE_POLYGON =
+  'safePolygon() → pass `safeArea: true` to useAnchor and render <SafeArea /> inside the floating element (a CSS rect over the gap; no pointer tracking, so no buffer/intent options)'
+
 export default function transform(file: FileInfo, api: API): string | undefined {
   const j: JSCodeshift = api.jscodeshift
   const root: Collection = j(file.source)
@@ -101,7 +108,17 @@ export default function transform(file: FileInfo, api: API): string | undefined 
     rewriteFloatingUsage(j, root, useFloatingLocal)
   }
 
-  // --- Pass 5: fix imports.
+  // --- Pass 5: flag the interaction-layer import we have an answer for.
+  if (localFor('safePolygon')) {
+    fuiImports.forEach((path) => {
+      const imports = (path.node.specifiers ?? []).some(
+        (spec: any) => spec.type === 'ImportSpecifier' && identName(spec.imported) === 'safePolygon',
+      )
+      if (imports) attachComment(j, path, TODO(SAFE_POLYGON))
+    })
+  }
+
+  // --- Pass 6: fix imports.
   fixImports(j, root, fuiImports, consumed, usedUseAnchor)
 
   return root.toSource({ quote: 'single' })

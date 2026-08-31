@@ -40,6 +40,20 @@ export interface AnchorOptions {
   size?: boolean | 'width' | 'height'
   /** `position` value for the floating element. Default `'fixed'`. */
   strategy?: Strategy
+  /**
+   * Emit a **safe area**: a transparent rectangle covering the corridor between
+   * the anchor and the floating element, so a pointer travelling diagonally
+   * between the two never crosses dead space and never triggers a close.
+   *
+   * This is the CSS-only counterpart of floating-ui's `safePolygon()`. It is a
+   * rectangle, not a cursor-tracked polygon (CSS can't read the pointer), so
+   * it's more forgiving: any path through the corridor keeps the pair alive.
+   * Default `false`.
+   *
+   * Render the returned `safeArea` styles on an element **inside** the floating
+   * element — see {@link buildAnchorStyles} for why.
+   */
+  safeArea?: boolean
 }
 
 /**
@@ -55,6 +69,11 @@ export interface AnchorStyles {
   floating: AnchorStyle
   /** Spread onto an optional arrow element (a sibling of the floating element). */
   arrow: AnchorStyle
+  /**
+   * Spread onto an optional safe-area element (a **child** of the floating
+   * element). `{ display: 'none' }` unless `safeArea` is on.
+   */
+  safeArea: AnchorStyle
 }
 
 type Align = 'start' | 'end' | 'center'
@@ -99,10 +118,49 @@ function flipFallbacks(blockAxis: boolean, align: Align): string {
 }
 
 /**
- * Build anchor / floating / arrow style objects for a placement.
+ * The corridor between the anchor and the floating element: the gap on the
+ * placement's own axis, the union of both boxes on the cross axis. Hovering it
+ * counts as "still travelling between the two", which is what floating-ui's
+ * `safePolygon()` buys with a `pointermove` listener and a cursor-tracked
+ * triangle.
+ *
+ * Every edge is `min()` of the *same* edge on both anchors. `anchor(--a right)`
+ * and `anchor(--f right)` are both distances from the containing block's left
+ * edge, so `min()` reads as "whichever box sits further left" — true no matter
+ * which side the browser ended up putting the floating element on, so the rect
+ * survives a native `flip` without any JS.
+ */
+function buildSafeArea(anchorName: string, floatingName: string, blockAxis: boolean): AnchorStyle {
+  const edge = (side: Side) => `min(anchor(${anchorName} ${side}), anchor(${floatingName} ${side}))`
+  return {
+    // Always fixed, never `strategy`: the safe area lives *inside* the floating
+    // element, and only `fixed` gives it the initial containing block. An
+    // absolutely positioned child would be laid out inside the floating box,
+    // where the anchor is no longer an acceptable anchor element and every
+    // `anchor()` silently falls back to `auto`.
+    position: 'fixed',
+    // The anchor is also the *default* anchor, which is what the browser's
+    // scroll adjustment keys off — without it the rect keeps its layout-time
+    // position and drifts by the scroll offset.
+    positionAnchor: anchorName,
+    margin: '0',
+    ...(blockAxis
+      ? { top: edge('bottom'), bottom: edge('top'), left: edge('left'), right: edge('right') }
+      : { left: edge('right'), right: edge('left'), top: edge('top'), bottom: edge('bottom') }),
+  }
+}
+
+/**
+ * Build anchor / floating / arrow / safe-area style objects for a placement.
+ *
+ * The arrow is a **sibling** of the floating element; the safe area (opt in
+ * with `safeArea`) is a **child** of it, because it references both boxes and a
+ * top-layer popover is only an acceptable anchor for another element in the top
+ * layer.
  *
  * @param anchorName a CSS dashed-ident, e.g. `'--cak-tooltip'`. Must be unique
- *   per anchor↔floating pair on the page.
+ *   per anchor↔floating pair on the page. When `safeArea` is on, the floating
+ *   element is named `${anchorName}-floating` so the safe area can span both.
  */
 export function buildAnchorStyles(
   anchorName: string,
@@ -115,6 +173,7 @@ export function buildAnchorStyles(
     hide = false,
     size = false,
     strategy = 'fixed',
+    safeArea = false,
   } = options
 
   const { side, align } = parsePlacement(placement)
@@ -176,7 +235,18 @@ export function buildAnchorStyles(
     if (size === true || size === 'height') floating.height = 'anchor-size(height)'
   }
 
-  return { anchor, floating, arrow }
+  // The safe area spans *both* boxes, so the floating element needs a name of
+  // its own. Only when asked: an unconditional `anchor-name` here would
+  // override one the consumer set in their own CSS.
+  const floatingName = `${anchorName}-floating`
+  if (safeArea) floating.anchorName = floatingName
+
+  return {
+    anchor,
+    floating,
+    arrow,
+    safeArea: safeArea ? buildSafeArea(anchorName, floatingName, blockAxis) : { display: 'none' },
+  }
 }
 
 /**

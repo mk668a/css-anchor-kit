@@ -71,6 +71,23 @@ function Pop() {
     expect(out).toContain('useAnchor(')
   })
 
+  it('points safePolygon() at the safeArea option', () => {
+    const out = run(`
+import { useFloating, useHover, useInteractions, safePolygon } from '@floating-ui/react'
+
+function Tip() {
+  const { refs, floatingStyles, context } = useFloating({ placement: 'right' })
+  const hover = useHover(context, { handleClose: safePolygon() })
+  useInteractions([hover])
+  return <button ref={refs.setReference}>Hover</button>
+}
+`)
+    expect(out).toContain('safeArea: true')
+    expect(out).toContain('<SafeArea />')
+    // The interaction hooks themselves are left alone — only flagged.
+    expect(out).toContain('useHover')
+  })
+
   it('handles an import-only / no-middleware call and drops autoUpdate', () => {
     const out = run(`
 import { useFloating, autoUpdate } from '@floating-ui/react'

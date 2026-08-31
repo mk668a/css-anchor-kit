@@ -114,4 +114,47 @@ describe('buildAnchorStyles', () => {
     expect(arrow.top).toBe('anchor(bottom)')
     expect(arrow.justifySelf).toBe('anchor-center')
   })
+
+  it('emits no safe area (and no floating anchor-name) by default', () => {
+    const { floating, safeArea } = buildAnchorStyles(NAME)
+    expect(floating.anchorName).toBeUndefined()
+    expect(safeArea).toEqual({ display: 'none' })
+  })
+
+  it('spans the gap on the placement axis and the union on the cross axis', () => {
+    const F = `${NAME}-floating`
+    const { floating, safeArea } = buildAnchorStyles(NAME, { safeArea: true })
+    // The floating element becomes an anchor too, so the rect can span both.
+    expect(floating.anchorName).toBe(F)
+    expect(safeArea.position).toBe('fixed')
+    // placement 'bottom' → gap runs down the block axis…
+    expect(safeArea.top).toBe(`min(anchor(${NAME} bottom), anchor(${F} bottom))`)
+    expect(safeArea.bottom).toBe(`min(anchor(${NAME} top), anchor(${F} top))`)
+    // …and the inline axis covers both boxes.
+    expect(safeArea.left).toBe(`min(anchor(${NAME} left), anchor(${F} left))`)
+    expect(safeArea.right).toBe(`min(anchor(${NAME} right), anchor(${F} right))`)
+  })
+
+  it('swaps which axis carries the gap for left/right placements', () => {
+    const F = `${NAME}-floating`
+    const { safeArea } = buildAnchorStyles(NAME, { placement: 'right', safeArea: true })
+    expect(safeArea.left).toBe(`min(anchor(${NAME} right), anchor(${F} right))`)
+    expect(safeArea.right).toBe(`min(anchor(${NAME} left), anchor(${F} left))`)
+    expect(safeArea.top).toBe(`min(anchor(${NAME} top), anchor(${F} top))`)
+  })
+
+  it('reads the same for a placement and its flipped opposite', () => {
+    // Both edges are a min() of the two boxes, so a native flip needs no new
+    // CSS — 'left' and 'right' produce byte-identical safe areas.
+    const right = buildAnchorStyles(NAME, { placement: 'right', safeArea: true }).safeArea
+    const left = buildAnchorStyles(NAME, { placement: 'left', safeArea: true }).safeArea
+    expect(left).toEqual(right)
+  })
+
+  it('keeps the safe area fixed even under the absolute strategy', () => {
+    // Absolute would make the floating element its containing block, and the
+    // anchor would stop being an acceptable anchor element.
+    const { safeArea } = buildAnchorStyles(NAME, { strategy: 'absolute', safeArea: true })
+    expect(safeArea.position).toBe('fixed')
+  })
 })

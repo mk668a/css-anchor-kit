@@ -44,6 +44,7 @@ floating-ui is ~28M weekly downloads of JavaScript whose core job — *keep this
 | Runtime cost | measure → place → `autoUpdate` loop | **none** (it's CSS) |
 | Bundle (min+gzip) | ~6–10 KB core + React | **< 1 KB**, React optional |
 | Arrow tracks anchor when shifted | needs JS middleware | a sibling anchored to the same element |
+| Hover survives the gap | `safePolygon()` — a cursor-tracked triangle, one `pointermove` listener | a rect the browser positions between the two boxes |
 | Works without React | yes | yes — [`buildAnchorStyles`](#vanilla--non-react) |
 
 ## Install
@@ -59,13 +60,14 @@ React 18+ is an **optional** peer dependency — you only need it for the `useAn
 ### `useAnchor(options?)`
 
 ```ts
-const { anchorProps, floatingProps, arrowProps, anchorName, supported } = useAnchor({
+const { anchorProps, floatingProps, arrowProps, safeAreaProps, anchorName, supported } = useAnchor({
   placement: 'bottom',  // Side | `${Side}-start` | `${Side}-end`, default 'bottom'
   offset:    0,         // gap in px, default 0
   flip:      true,      // flip to the opposite side on overflow, default true
   hide:      false,     // hide when the anchor scrolls out of view, default false
   size:      false,     // match the anchor's size: 'width' | 'height' | true, default false
   strategy:  'fixed',   // 'fixed' | 'absolute', default 'fixed'
+  safeArea:  false,     // hoverable corridor across the offset gap, default false
 })
 ```
 
@@ -76,6 +78,7 @@ Returns:
 | `anchorProps` | `{ style }` | spread on the reference element |
 | `floatingProps` | `{ style }` | spread on the floating element |
 | `arrowProps` | `{ style }` | spread on an optional arrow element (a **sibling** of the floating one) |
+| `safeAreaProps` | `{ style }` | spread on an optional [safe area](#safe-area-the-safepolygon-problem) (a **child** of the floating one) |
 | `anchorName` | `string` | the generated `--cak-*` dashed-ident (for hand-written CSS) |
 | `supported` | `boolean` | `false` during SSR + first paint, then reflects browser support |
 
@@ -119,7 +122,7 @@ import { Anchored, Anchor, Floating, Arrow } from 'css-anchor-kit'
 </Anchored>
 ```
 
-`<Anchored>` runs `useAnchor` and shares it via context; `<Anchor>`/`<Floating>`/`<Arrow>` are polymorphic (`as` prop, default `div`) and spread the matching props. The hook stays the primary API — components are pure DX sugar and tree-shake away if unused.
+`<Anchored>` runs `useAnchor` and shares it via context; `<Anchor>`/`<Floating>`/`<Arrow>`/[`<SafeArea>`](#safe-area-the-safepolygon-problem) are polymorphic (`as` prop, default `div`) and spread the matching props. The hook stays the primary API — components are pure DX sugar and tree-shake away if unused.
 
 ### Popover, Tooltip, Menu — the interaction half
 
@@ -187,6 +190,59 @@ return (
 )
 ```
 
+### Safe area (the `safePolygon` problem)
+
+Give a floating element an `offset` and you carve out a gap that belongs to neither box. Move the pointer diagonally toward the card and it lands on nothing, so the card closes exactly as you reach for it. floating-ui answers this with `safePolygon()`: a cursor-tracked triangle rebuilt on every `pointermove`.
+
+CSS can't read the pointer — but it doesn't have to. The corridor between two boxes is a **rectangle**, and rectangles are what `anchor()` is good at. Turn on `safeArea` and render the safe area **inside** the floating element:
+
+```tsx
+import { Tooltip, TooltipTrigger, TooltipContent, SafeArea } from 'css-anchor-kit'
+
+<Tooltip placement="right" offset={24} safeArea>
+  <TooltipTrigger className="btn">Hover me</TooltipTrigger>
+  <TooltipContent className="card">
+    <SafeArea />          {/* transparent, no children — just a hover target */}
+    Reachable across the gap.
+  </TooltipContent>
+</Tooltip>
+```
+
+It compiles to one more `anchor-name` (on the floating element) and a rect spanning both:
+
+```css
+/* placement 'right' → the gap runs along the inline axis, the block axis covers both boxes */
+left:   min(anchor(--a right), anchor(--f right));
+right:  min(anchor(--a left),  anchor(--f left));
+top:    min(anchor(--a top),    anchor(--f top));
+bottom: min(anchor(--a bottom), anchor(--f bottom));
+```
+
+Every edge is a `min()` of the *same* edge on both boxes — `min(anchor(--a right), anchor(--f right))` reads as "whichever box sits further left" — so the corridor stays right after a native `flip`, with no JS deciding anything. [Live demo →](https://css-anchor-kit.netlify.app/#safe-area)
+
+**With the bare hook**, you own visibility, so let the close wait one task: the browser fires `pointerleave` on the trigger *before* `pointerenter` on the safe area, and an immediate close would hide the corridor before it could catch anything. (`<Tooltip>` already does this for you.)
+
+```tsx
+const { anchorProps, floatingProps, safeAreaProps } = useAnchor({
+  placement: 'right', offset: 24, safeArea: true,
+})
+const openNow   = () => { clearTimeout(timer.current); setOpen(true) }
+const closeSoon = () => { timer.current = setTimeout(() => setOpen(false), 0) }
+
+<button {...anchorProps} onPointerEnter={openNow} onPointerLeave={closeSoon}>Hover me</button>
+{open && (
+  <div {...floatingProps} onPointerEnter={openNow} onPointerLeave={closeSoon}>
+    <div {...safeAreaProps} />
+    Reachable across the gap.
+  </div>
+)}
+```
+
+One rule the CSS enforces on you, and one honest trade-off:
+
+- The safe area is a **child** of the floating element (the arrow is a sibling — this one isn't). A top-layer popover is only an acceptable anchor for something else in the top layer, and only `position: fixed` keeps the corridor's containing block outside the floating box. Both come free by rendering it inside.
+- It's a rect, not a shrinking polygon, so it's *more* forgiving than floating-ui's: any path through the corridor keeps the pair alive, not just one aimed at the card. No cursor tracking means no `buffer` and no intent detection, and while the floating element is open the corridor swallows pointer events over whatever sits between the two boxes.
+
 ### Vanilla / non-React
 
 ```ts
@@ -220,6 +276,7 @@ useEffect(() => {
 | `arrow()` middleware + `ref` | spread `arrowProps` on a sibling |
 | `refs.setReference` / `setFloating` | spread `anchorProps` / `floatingProps` |
 | `autoUpdate(...)` | — not needed, the browser tracks it |
+| `useHover(..., { handleClose: safePolygon() })` | `safeArea: true` + `<SafeArea />` (a rect, not a cursor-tracked polygon) |
 
 ### Automated migration (`migrate` codemod)
 
@@ -233,7 +290,8 @@ npx css-anchor-kit migrate "src/**/*.tsx" --dry --print   # preview only
 It rewrites `useFloating(...)` → `useAnchor(...)`, maps `offset`/`flip`/`hide`
 middleware to options, drops the `autoUpdate` loop, rewires
 `ref={refs.setReference}`/`setFloating` to `{...anchorProps}`/`{...floatingProps}`,
-and fixes the imports. Anything without a native equivalent — `shift`, `size`,
+and fixes the imports. It also flags `safePolygon()` and points it at `safeArea`.
+Anything without a native equivalent — `shift`, `size`,
 `autoPlacement`, `inline`, and `arrow` ref-wiring — is left in place with a
 `// TODO(css-anchor-kit)` comment rather than silently dropped, so you can finish
 those by hand:
@@ -251,10 +309,11 @@ CSS Anchor Positioning is **discrete**, not continuous, so the kit is intentiona
 
 - **`shift`** (continuously *sliding* a popover pixel-by-pixel to stay in view) has **no native equivalent** — the platform's fallback model is discrete (try position A, then B, …), not continuous. `flip` covers the common overflow case natively; if you genuinely need continuous shifting, floating-ui is still the right tool.
 - **`autoPlacement`** (pick the best of many sides at runtime) isn't mapped; choose a `placement` + `flip`.
+- **`safePolygon()`'s cursor tracking** can't be reproduced — CSS has no way to read the pointer. [`safeArea`](#safe-area-the-safepolygon-problem) covers the same failure with a static rect over the gap, which is more forgiving but has no `buffer` or intent detection.
 
 Everything else floating-ui is used for in the 90% tooltip/popover/menu case — placement, offset, flip, hide, **size**, arrows, and **RTL/logical alignment** — is covered, natively, with no JS in the scroll path.
 
-> Verified in Chromium 148: all 12 placements position correctly (right side, ~8px gap, logical `-start`/`-end` alignment), `size` matches the anchor, and `flip` kicks in on overflow.
+> Verified in Chrome 152 by [`examples/verify.html`](./examples/verify.html), a geometry harness that asserts real `getBoundingClientRect()` values: all 12 placements position correctly (right side, ~8px gap, logical `-start`/`-end` alignment), `size` matches the anchor, `flip` kicks in on overflow, and the [safe area](#safe-area-the-safepolygon-problem) fills the gap exactly — and is hit-testable — on all four sides.
 
 ## Roadmap
 
@@ -263,6 +322,7 @@ Everything else floating-ui is used for in the 90% tooltip/popover/menu case —
 - [x] headless `<Anchor>` / `<Floating>` / `<Arrow>` components
 - [x] `npx css-anchor-kit migrate` codemod (floating-ui → css-anchor-kit)
 - [x] `<Popover>` / `<Tooltip>` / `<Menu>` on the native Popover API (top layer, light dismiss — no portal JS)
+- [x] `safeArea` — floating-ui's `safePolygon()` as a pure-CSS hover corridor
 - [ ] discrete `shift` approximation via generated `@position-try` fallback positions (exploration; continuous shift is not expressible in pure CSS)
 
 ## License

@@ -8,6 +8,7 @@ import { ComponentsPlayground } from './demos/ComponentsPlayground'
 import { FlipDemo } from './demos/FlipDemo'
 import { FlipFrameDemo } from './demos/FlipFrameDemo'
 import { PopoverKitDemo } from './demos/PopoverKitDemo'
+import { SafeAreaDemo } from './demos/SafeAreaDemo'
 
 const REPO = 'https://github.com/mk668a/css-anchor-kit'
 
@@ -18,6 +19,7 @@ const SECTIONS: NavItem[] = [
   { id: 'quick-start', label: 'Install & quick start' },
   { id: 'components', label: 'Components & popover' },
   { id: 'popover-kit', label: 'Popover · Tooltip · Menu' },
+  { id: 'safe-area', label: 'Safe area' },
   { id: 'support', label: 'Browser support' },
 ]
 
@@ -48,6 +50,35 @@ const POPOVER_KIT_CODE = `import { Popover, PopoverTrigger, PopoverContent } fro
 // Same engine, two more flavors:
 <Tooltip openDelay={150}>…</Tooltip>   // hover/focus, role="tooltip"
 <Menu>…<MenuItem onClick={…} />…</Menu> // role="menu", arrow-key navigation`
+
+const SAFE_AREA_CODE = `import { Tooltip, TooltipTrigger, TooltipContent, SafeArea } from 'css-anchor-kit'
+
+<Tooltip placement="right" offset={24} safeArea>
+  <TooltipTrigger className="btn">Hover me</TooltipTrigger>
+  <TooltipContent className="card">
+    <SafeArea />        {/* a child of the floating element, not a sibling */}
+    Reachable across the gap.
+  </TooltipContent>
+</Tooltip>`
+
+const SAFE_AREA_HOOK_CODE = `const { anchorProps, floatingProps, safeAreaProps } = useAnchor({
+  placement: 'right',
+  offset: 24,
+  safeArea: true,
+})
+
+// The hook only positions — you own open/close, so let the close wait one task
+// for the pointer to land in the corridor.
+const openNow = () => { clearTimeout(timer.current); setOpen(true) }
+const closeSoon = () => { timer.current = setTimeout(() => setOpen(false), 0) }
+
+<button {...anchorProps} onPointerEnter={openNow} onPointerLeave={closeSoon}>Hover me</button>
+{open && (
+  <div {...floatingProps} onPointerEnter={openNow} onPointerLeave={closeSoon}>
+    <div {...safeAreaProps} />
+    Reachable across the gap.
+  </div>
+)}`
 
 const SUPPORT_CODE = `import { isAnchorPositioningSupported } from 'css-anchor-kit/core'
 
@@ -302,6 +333,12 @@ export function App() {
                     <td><code>position</code></td>
                   </tr>
                   <tr>
+                    <td><code>safeArea</code></td>
+                    <td><code>boolean</code></td>
+                    <td><code>false</code></td>
+                    <td>a second <code>anchor-name</code> + an <code>anchor()</code> rect over the gap</td>
+                  </tr>
+                  <tr>
                     <td><code>boundary</code></td>
                     <td><code>Element | RefObject</code></td>
                     <td><code>—</code></td>
@@ -328,6 +365,7 @@ export function App() {
                   <tr><td><code>anchorProps</code></td><td>the reference element</td><td>sets <code>anchor-name</code></td></tr>
                   <tr><td><code>floatingProps</code></td><td>the positioned element</td><td>sets <code>position</code> + insets</td></tr>
                   <tr><td><code>arrowProps</code></td><td>an optional arrow</td><td>omit it for no arrow</td></tr>
+                  <tr><td><code>safeAreaProps</code></td><td>a child of the floating element</td><td>the hover corridor; needs <code>safeArea</code> (see <a href="#safe-area">Safe area</a>)</td></tr>
                   <tr><td><code>placement</code></td><td>—</td><td>the placement in effect (a <code>boundary</code> may have flipped it)</td></tr>
                   <tr><td><code>anchorName</code></td><td>—</td><td>the generated dashed-ident, for manual CSS</td></tr>
                   <tr><td><code>supported</code></td><td>—</td><td>feature-detect; <code>false</code> during SSR / first render</td></tr>
@@ -392,6 +430,54 @@ export function App() {
               dismiss and Escape report through <code>onOpenChange</code> like
               any other close.
             </p>
+          </section>
+
+          <section id="safe-area">
+            <h2>Safe area</h2>
+            <p>
+              A floating element with an <code>offset</code> has a gap under it,
+              and the gap belongs to neither box. Move the pointer diagonally
+              toward the card and it lands on nothing — so the card closes right
+              as you reach for it. floating-ui solves this with{' '}
+              <code>safePolygon()</code>: a cursor-tracked triangle rebuilt on
+              every <code>pointermove</code>.
+            </p>
+            <p>
+              CSS can&apos;t read the pointer, but it doesn&apos;t need to. The
+              corridor between two boxes is a <em>rectangle</em>, and rectangles
+              are what <code>anchor()</code> is good at. Turn on{' '}
+              <code>safeArea</code> and render <code>&lt;SafeArea /&gt;</code>{' '}
+              inside the floating element: the browser spans it from one box to
+              the other, and hovering it counts as still being there.
+            </p>
+            <SafeAreaDemo />
+            <CodeBlock code={SAFE_AREA_CODE} lang="tsx" />
+            <p>
+              Each edge of the rect is a <code>min()</code> of the same edge on
+              both boxes — <code>min(anchor(--a right), anchor(--f right))</code>{' '}
+              reads as &ldquo;whichever box sits further left&rdquo; — so the
+              corridor stays correct after a native <code>flip</code> with no JS
+              deciding anything.
+            </p>
+            <p className="hint">
+              It is a rect, not a shrinking polygon, so it is{' '}
+              <strong>more</strong> forgiving than floating-ui&apos;s: any path
+              through the corridor keeps the pair alive, not just one aimed at
+              the card. There is no cursor tracking, so there is no{' '}
+              <code>buffer</code> or intent detection — and while the card is
+              open the corridor swallows pointer events over whatever sits
+              between the two boxes.
+            </p>
+            <h3>With the bare hook</h3>
+            <p>
+              <code>&lt;Tooltip&gt;</code> already waits a task before closing so
+              the pointer can land in the corridor. With <code>useAnchor</code>{' '}
+              you own visibility, so do the same yourself — the browser fires{' '}
+              <code>pointerleave</code> on the trigger <em>before</em>{' '}
+              <code>pointerenter</code> on the safe area, and an immediate close
+              would hide the corridor before it can catch anything.
+            </p>
+            <CodeBlock code={SAFE_AREA_HOOK_CODE} lang="tsx" />
           </section>
 
           <section id="support">

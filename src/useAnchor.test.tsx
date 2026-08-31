@@ -23,6 +23,22 @@ describe('useAnchor', () => {
     expect((floatingProps.style as Record<string, unknown>).marginBottom).toBe('6px')
   })
 
+  it('reports safeArea off with inert safe-area props by default', () => {
+    const { result } = renderHook(() => useAnchor())
+    expect(result.current.safeArea).toBe(false)
+    expect(result.current.safeAreaProps.style).toEqual({ display: 'none' })
+  })
+
+  it('builds safe-area props from the anchor pair when enabled', () => {
+    const { result } = renderHook(() => useAnchor({ placement: 'right', safeArea: true }))
+    const { anchorName, safeArea, safeAreaProps } = result.current
+    expect(safeArea).toBe(true)
+    expect(safeAreaProps.style.position).toBe('fixed')
+    expect(safeAreaProps.style.left).toBe(
+      `min(anchor(${anchorName} right), anchor(${anchorName}-floating right))`,
+    )
+  })
+
   it('resolves `supported` from CSS.supports after mount', () => {
     vi.stubGlobal('CSS', { supports: () => true })
     expect(renderHook(() => useAnchor()).result.current.supported).toBe(true)

@@ -2,8 +2,8 @@
  * Optional headless components — thin sugar over {@link useAnchor}.
  *
  * `<Anchored>` runs the hook and shares its result via context; `<Anchor>`,
- * `<Floating>` and `<Arrow>` are polymorphic elements that spread the matching
- * props. Styling and visibility stay entirely yours.
+ * `<Floating>`, `<Arrow>` and `<SafeArea>` are polymorphic elements that spread
+ * the matching props. Styling and visibility stay entirely yours.
  *
  * ```tsx
  * <Anchored placement="top" offset={8}>
@@ -90,12 +90,22 @@ export function mergeRefs(...refs: Array<Ref<unknown> | undefined>): Ref<unknown
 }
 
 /** Build a polymorphic component that spreads one slot's props (merging style). */
-function slot(slotKey: 'anchorProps' | 'floatingProps' | 'arrowProps', displayName: string) {
+function slot(
+  slotKey: 'anchorProps' | 'floatingProps' | 'arrowProps' | 'safeAreaProps',
+  displayName: string,
+  /** Slots whose styles are inert unless the matching option is on. */
+  requiresSafeArea = false,
+) {
   const Component = forwardRef<unknown, PolymorphicProps>(function Slot(
     { as, style, ...rest },
     ref,
   ) {
     const ctx = useAnchorContext(displayName)
+    if (requiresSafeArea && !ctx.safeArea) {
+      throw new Error(
+        `<${displayName}> needs the \`safeArea\` option — e.g. <Anchored safeArea> or <Tooltip safeArea>.`,
+      )
+    }
     const props = ctx[slotKey]
     // anchorProps/floatingProps carry an internal ref for boundary-scoped flip;
     // merge it with the consumer's ref so both fire. arrowProps has none.
@@ -119,3 +129,10 @@ export const Anchor = slot('anchorProps', 'Anchor')
 export const Floating = slot('floatingProps', 'Floating')
 /** An optional arrow (a sibling of the floating element). Spreads `arrowProps`. */
 export const Arrow = slot('arrowProps', 'Arrow')
+/**
+ * The hover corridor between anchor and floating element — floating-ui's
+ * `safePolygon()`, as a rectangle the browser positions. Render it **inside**
+ * `<Floating>` (or `<PopoverContent>` / `<TooltipContent>` / `<MenuContent>`)
+ * and enable the `safeArea` option; it's transparent and has no children.
+ */
+export const SafeArea = slot('safeAreaProps', 'SafeArea', true)

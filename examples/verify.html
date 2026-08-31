@@ -64,10 +64,79 @@
 
         wrap.append(btn, float)
         root.append(wrap)
-        pairs.push({ placement, btn, float })
+        pairs.push({ placement, btn, float, wrap })
       })
 
+      // --- safe area: one pair per side, the corridor rendered as a child of
+      // the floating element (the only place both anchors stay in scope).
+      const SAFE_SIDES = ['top', 'bottom', 'left', 'right']
+      const safePairs = []
+      SAFE_SIDES.forEach((placement, i) => {
+        const x = 200 + i * 320
+        const y = 1300
+
+        const wrap = document.createElement('div')
+        wrap.className = 'pair'
+
+        const anchorName = `--cak-s${i}`
+        const btn = document.createElement('button')
+        btn.className = 'anchor'
+        btn.textContent = placement
+        btn.style.left = x + 'px'
+        btn.style.top = y + 'px'
+
+        const float = document.createElement('div')
+        float.className = 'float'
+        float.textContent = placement
+
+        const safe = document.createElement('div')
+        const styles = buildAnchorStyles(anchorName, {
+          placement,
+          offset: 24,
+          flip: false,
+          safeArea: true,
+        })
+        Object.assign(btn.style, styles.anchor)
+        Object.assign(float.style, styles.floating)
+        Object.assign(safe.style, styles.safeArea)
+
+        float.append(safe)
+        wrap.append(btn, float)
+        root.append(wrap)
+        safePairs.push({ placement, btn, float, safe })
+      })
+
+      // Every pair is absolutely/fixed positioned and contributes no flow
+      // height, so the page would scroll no further than the last anchor —
+      // leaving the bottom row pinned to the viewport edge where
+      // `scrollIntoView({ block: 'center' })` can't actually center it (and a
+      // corridor just below it falls outside the viewport, where
+      // `elementFromPoint` sees nothing). This spacer is in flow, so it has to
+      // clear the lowest anchor on its own.
+      const spacer = document.createElement('div')
+      spacer.style.height = '2000px'
+      root.append(spacer)
+
       const raf = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+      // Anchor positioning is scroll-adjusted off the main thread, so after a
+      // programmatic scroll the new position can be a couple of frames behind
+      // the rects we're about to read. Two frames alone flake; give it a beat.
+      // A floating box whose anchor was off-screen when it was first laid out
+      // gets clamped into the viewport (expected: `position: fixed` is
+      // viewport-relative). Chrome's scroll adjustment then moves that clamped
+      // box, so scrolling the anchor into view isn't enough to un-clamp it —
+      // only a fresh layout is. Every pair here starts off-screen, so re-lay it
+      // out after scrolling, then let the adjustment settle.
+      const settle = async (el) => {
+        if (el) {
+          el.style.display = 'none'
+          void el.offsetHeight
+          el.style.display = ''
+        }
+        await raf()
+        await new Promise((r) => setTimeout(r, 60))
+        await raf()
+      }
 
       // Assert geometry once layout settles. Each anchor is scrolled into view
       // first: `position: fixed` + `anchor-center` is viewport-relative, so an
@@ -78,7 +147,7 @@
         const results = []
         for (const { placement, btn, float } of pairs) {
           btn.scrollIntoView({ block: 'center', inline: 'center' })
-          await raf()
+          await settle(float)
           const a = btn.getBoundingClientRect()
           const f = float.getBoundingClientRect()
           const [side, align] = placement.split('-')
@@ -113,7 +182,51 @@
             if (align === 'end' && Math.abs(f.bottom - a.bottom) > T) fails.push(`end edge Δ=${(f.bottom - a.bottom).toFixed(1)}`)
           }
 
+          if (fails.length) {
+            fails.push(`ctx scrollY=${window.scrollY} a=[${a.top.toFixed(0)},${a.bottom.toFixed(0)}] f=[${f.top.toFixed(0)},${f.bottom.toFixed(0)}]`)
+          }
           results.push({ placement, ok: fails.length === 0, fails })
+        }
+
+        // The 12 placement pairs are `position: fixed`, so once we scroll past
+        // them the browser clamps their floating boxes into view, where they'd
+        // sit on top of the corridor and spoil the hit test. They're measured
+        // by now — take them out.
+        for (const { wrap } of pairs) wrap.style.display = 'none'
+        await raf()
+
+
+        // The safe area must fill the gap exactly on the placement's own axis
+        // and cover both boxes on the cross axis.
+        const safeResults = []
+        for (const { placement, btn, float, safe } of safePairs) {
+          btn.scrollIntoView({ block: 'center', inline: 'center' })
+          await settle(float)
+          const a = btn.getBoundingClientRect()
+          const f = float.getBoundingClientRect()
+          const s = safe.getBoundingClientRect()
+          const blockAxis = placement === 'top' || placement === 'bottom'
+          const near = (x, y, label) => (Math.abs(x - y) > T ? [`${label} Δ=${(x - y).toFixed(1)}`] : [])
+          const fails = blockAxis
+            ? [
+                ...near(s.top, Math.min(a.bottom, f.bottom), 'gap top'),
+                ...near(s.bottom, Math.max(a.top, f.top), 'gap bottom'),
+                ...near(s.left, Math.min(a.left, f.left), 'union left'),
+                ...near(s.right, Math.max(a.right, f.right), 'union right'),
+              ]
+            : [
+                ...near(s.left, Math.min(a.right, f.right), 'gap left'),
+                ...near(s.right, Math.max(a.left, f.left), 'gap right'),
+                ...near(s.top, Math.min(a.top, f.top), 'union top'),
+                ...near(s.bottom, Math.max(a.bottom, f.bottom), 'union bottom'),
+              ]
+          // …and it has to be hit-testable, or it isn't a hover corridor.
+          const mid = { x: (s.left + s.right) / 2, y: (s.top + s.bottom) / 2 }
+          if (document.elementFromPoint(mid.x, mid.y) !== safe) {
+            const hit = document.elementFromPoint(mid.x, mid.y)
+            fails.push(`not hit-testable at its center (got ${hit ? hit.className || hit.tagName : 'null'} @ ${mid.x.toFixed(0)},${mid.y.toFixed(0)}; safe=${JSON.stringify({l:s.left,t:s.top,w:s.width,h:s.height})})`)
+          }
+          safeResults.push({ placement, ok: fails.length === 0, fails })
         }
 
         window.__verify = {
@@ -121,6 +234,11 @@
           results,
           passed: results.filter((r) => r.ok).length,
           total: results.length,
+          safeArea: {
+            results: safeResults,
+            passed: safeResults.filter((r) => r.ok).length,
+            total: safeResults.length,
+          },
         }
         window.__verifyDone = true
       }

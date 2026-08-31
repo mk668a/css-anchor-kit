@@ -13,6 +13,7 @@ import {
   TooltipTrigger,
   isPopoverSupported,
 } from './popover'
+import { SafeArea } from './components'
 
 // happy-dom doesn't implement the Popover API (no showPopover), so by default
 // these tests exercise the fallback path. installNativeStub() simulates the
@@ -237,6 +238,53 @@ describe('Tooltip', () => {
     fireEvent.pointerOut(trigger)
     act(() => {
       vi.advanceTimersByTime(300)
+    })
+    expect(tip.style.display).toBe('none')
+  })
+
+  it('keeps the tooltip open when the pointer crosses into the safe area', () => {
+    vi.useFakeTimers()
+    const { container } = render(
+      <Tooltip placement="right" offset={16} defaultOpen safeArea>
+        <TooltipTrigger>Hover</TooltipTrigger>
+        <TooltipContent data-testid="tip">
+          <SafeArea data-testid="safe" />
+          Hi
+        </TooltipContent>
+      </Tooltip>,
+    )
+    const trigger = container.querySelector('button') as HTMLElement
+    const tip = container.querySelector('[data-testid="tip"]') as HTMLElement
+    const safe = container.querySelector('[data-testid="safe"]') as HTMLElement
+
+    // Leaving the trigger *towards* the corridor: the browser fires leave on
+    // the trigger before enter on the safe area, so the close must be deferred
+    // long enough for the enter to cancel it.
+    fireEvent.pointerOut(trigger, { relatedTarget: safe })
+    fireEvent.pointerOver(safe, { relatedTarget: trigger })
+    act(() => {
+      vi.advanceTimersByTime(50)
+    })
+    expect(tip.style.display).not.toBe('none')
+  })
+
+  it('still closes when the pointer leaves for somewhere else', () => {
+    vi.useFakeTimers()
+    const { container } = render(
+      <Tooltip placement="right" offset={16} defaultOpen safeArea>
+        <TooltipTrigger>Hover</TooltipTrigger>
+        <TooltipContent data-testid="tip">
+          <SafeArea data-testid="safe" />
+          Hi
+        </TooltipContent>
+      </Tooltip>,
+    )
+    const trigger = container.querySelector('button') as HTMLElement
+    const tip = container.querySelector('[data-testid="tip"]') as HTMLElement
+
+    fireEvent.pointerOut(trigger)
+    act(() => {
+      vi.advanceTimersByTime(50)
     })
     expect(tip.style.display).toBe('none')
   })

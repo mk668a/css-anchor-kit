@@ -41,6 +41,11 @@ export interface UseAnchorReturn {
   floatingProps: { style: CSSProperties; ref: AnchorRef }
   /** Spread onto an optional arrow element (sibling of the floating element). */
   arrowProps: { style: CSSProperties }
+  /**
+   * Spread onto an optional safe-area element — a **child** of the floating
+   * element. Inert unless the `safeArea` option is on.
+   */
+  safeAreaProps: { style: CSSProperties }
   /** The generated `anchor-name` dashed-ident (e.g. for manual CSS). */
   anchorName: string
   /**
@@ -48,6 +53,8 @@ export interface UseAnchorReturn {
    * `boundary` flipped it to the opposite side.
    */
   placement: Placement
+  /** Whether a safe area is enabled (mirrors the `safeArea` option). */
+  safeArea: boolean
   /**
    * Whether the browser supports CSS Anchor Positioning. `false` during SSR and
    * on the first client render (set `true` after mount to avoid hydration
@@ -84,7 +91,7 @@ function resolveBoundary(boundary: Boundary | undefined): Element | null {
  * an inner scroll container (the one thing CSS can't do).
  */
 export function useAnchor(options: UseAnchorOptions = {}): UseAnchorReturn {
-  const { placement, offset, flip, hide, size, strategy, boundary } = options
+  const { placement, offset, flip, hide, size, strategy, safeArea, boundary } = options
   const requested = placement ?? 'bottom'
 
   const id = useId()
@@ -121,8 +128,9 @@ export function useAnchor(options: UseAnchorOptions = {}): UseAnchorReturn {
         hide,
         size,
         strategy,
+        safeArea,
       }),
-    [anchorName, effPlacement, offset, cssFlip, hide, size, strategy],
+    [anchorName, effPlacement, offset, cssFlip, hide, size, strategy, safeArea],
   )
 
   // Boundary-scoped flip: measure on scroll/resize, swap placement when the
@@ -181,7 +189,9 @@ export function useAnchor(options: UseAnchorOptions = {}): UseAnchorReturn {
     anchorProps: { style: styles.anchor as CSSProperties, ref: setAnchorEl },
     floatingProps: { style: styles.floating as CSSProperties, ref: setFloatingEl },
     arrowProps: { style: styles.arrow as CSSProperties },
+    safeAreaProps: { style: styles.safeArea as CSSProperties },
     anchorName,
+    safeArea: safeArea === true,
     placement: effPlacement,
     supported,
   }
