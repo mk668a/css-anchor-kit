@@ -23,6 +23,9 @@
       }
       .trap button { position: static; width: 60px; height: 24px; }
       .trap .float { width: 160px; }
+      /* Deliberately unrotated: the rotation consumers apply is purely visual,
+         and a square box makes the hit test at the tip deterministic. */
+      .arrow { background: #36c; }
     </style>
   </head>
   <body>
@@ -115,6 +118,76 @@
         safePairs.push({ placement, btn, float, safe })
       })
 
+      // --- arrow: centred on the floating element's facing edge, at any size,
+      // rendered as a child of the floating element (where it escapes the
+      // surface's own box-shadow and rides into the top layer with it).
+      const arrowPairs = []
+      function buildArrowPair({ placement, size, flip, x, y, key }) {
+        const wrap = document.createElement('div')
+        wrap.className = 'pair'
+
+        const anchorName = `--cak-${key}`
+        const btn = document.createElement('button')
+        btn.className = 'anchor'
+        btn.textContent = placement
+        btn.style.left = x + 'px'
+        btn.style.top = y + 'px'
+
+        const float = document.createElement('div')
+        float.className = 'float'
+        float.textContent = placement
+
+        const arrow = document.createElement('div')
+        arrow.className = 'arrow'
+        arrow.style.width = size + 'px'
+        arrow.style.height = size + 'px'
+
+        const styles = buildAnchorStyles(anchorName, { placement, offset: 16, flip })
+        Object.assign(btn.style, styles.anchor)
+        Object.assign(float.style, styles.floating)
+        Object.assign(arrow.style, styles.arrow)
+
+        float.append(arrow)
+        wrap.append(btn, float)
+        root.append(wrap)
+        return { placement, size, flip, btn, float, arrow, wrap }
+      }
+
+      PLACEMENTS.forEach((placement, i) => {
+        arrowPairs.push(buildArrowPair({
+          placement, size: 12, flip: false, key: `a${i}`,
+          x: 200 + (i % 3) * 320, y: 1560 + Math.floor(i / 3) * 250,
+        }))
+      })
+      // Size independence: nothing in the formula knows how big the arrow is.
+      SAFE_SIDES.forEach((placement, i) => {
+        arrowPairs.push(buildArrowPair({
+          placement, size: 28, flip: false, key: `ab${i}`,
+          x: 200 + i * 240, y: 2560,
+        }))
+      })
+
+      // --- arrow mounted while the page is already scrolled. This is the
+      // ordinary case (a tooltip opens halfway down a page) and the one that
+      // catches an `anchor()` resolved against stale, document-space
+      // coordinates: the anchor's registered position and the viewport agree
+      // only at scroll 0. Deliberately measured *without* the forced relayout
+      // in `settle`, which would paper over exactly that.
+      const lateSpecs = SAFE_SIDES.map((placement, i) => {
+        const anchorName = `--cak-al${i}`
+        const btn = document.createElement('button')
+        btn.className = 'anchor'
+        btn.textContent = placement
+        btn.style.left = 200 + i * 240 + 'px'
+        btn.style.top = '2810px'
+        Object.assign(btn.style, buildAnchorStyles(anchorName, { placement }).anchor)
+        const wrap = document.createElement('div')
+        wrap.className = 'pair'
+        wrap.append(btn)
+        root.append(wrap)
+        return { placement, anchorName, btn, wrap }
+      })
+
       // Every pair is absolutely/fixed positioned and contributes no flow
       // height, so the page would scroll no further than the last anchor —
       // leaving the bottom row pinned to the viewport edge where
@@ -123,7 +196,7 @@
       // `elementFromPoint` sees nothing). This spacer is in flow, so it has to
       // clear the lowest anchor on its own.
       const spacer = document.createElement('div')
-      spacer.style.height = '2000px'
+      spacer.style.height = '3800px'
       root.append(spacer)
 
       const raf = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
@@ -238,6 +311,91 @@
           safeResults.push({ placement, ok: fails.length === 0, fails })
         }
 
+        // --- arrow: the box is centred on the floating element's facing edge
+        // (main axis) and on the anchor's centre (cross axis), whatever its
+        // size, and it is painted *above* the surface rather than under it.
+        for (const { float } of safePairs) float.style.display = 'none'
+        await raf()
+
+        const effectiveSide = (a, f) =>
+          f.top >= a.bottom - T ? 'bottom'
+          : f.bottom <= a.top + T ? 'top'
+          : f.left >= a.right - T ? 'right'
+          : 'left'
+
+        async function checkArrow({ placement, size, btn, float, arrow }, scroll) {
+          if (scroll !== false) {
+            btn.scrollIntoView({ block: 'center', inline: 'center' })
+            await settle(float)
+          }
+          const a = btn.getBoundingClientRect()
+          const f = float.getBoundingClientRect()
+          const r = arrow.getBoundingClientRect()
+          const side = effectiveSide(a, f)
+          const blockAxis = side === 'top' || side === 'bottom'
+          const fails = []
+
+          // 1. Centred on the edge that faces the anchor — so exactly half of it
+          //    sticks out, at any size.
+          const facing =
+            side === 'bottom' ? f.top : side === 'top' ? f.bottom :
+            side === 'right' ? f.left : f.right
+          const main = blockAxis ? (r.top + r.bottom) / 2 : (r.left + r.right) / 2
+          if (Math.abs(main - facing) > T) fails.push(`not on the facing edge (Δ=${(main - facing).toFixed(1)})`)
+
+          // 2. Still pointing at the anchor on the cross axis, even when the
+          //    floating box is edge-aligned.
+          const ac = blockAxis ? (a.left + a.right) / 2 : (a.top + a.bottom) / 2
+          const rc = blockAxis ? (r.left + r.right) / 2 : (r.top + r.bottom) / 2
+          if (Math.abs(rc - ac) > T) fails.push(`not centred on the anchor (Δ=${(rc - ac).toFixed(1)})`)
+
+          // 3. The half outside the surface is really painted there. A sibling
+          //    arrow would be under the surface's box-shadow; a child is not.
+          const out = size / 4
+          const tip = blockAxis
+            ? { x: rc, y: side === 'bottom' ? main - out : main + out }
+            : { x: side === 'right' ? main - out : main + out, y: rc }
+          const hit = document.elementFromPoint(tip.x, tip.y)
+          if (hit !== arrow) fails.push(`tip not on top (got ${hit ? hit.className || hit.tagName : 'null'})`)
+
+          return { placement, size, side, fails }
+        }
+
+        const arrowResults = []
+        for (const pair of arrowPairs) {
+          const { placement, side, fails } = await checkArrow(pair)
+          if (side !== placement.split('-')[0]) fails.push(`flipped unexpectedly to ${side}`)
+          arrowResults.push({ name: `${placement} @${pair.size}px`, ok: fails.length === 0, fails })
+        }
+
+        for (const { wrap } of arrowPairs) wrap.style.display = 'none'
+        await raf()
+
+        const arrowLateResults = []
+        for (const { placement, anchorName, btn, wrap } of lateSpecs) {
+          btn.scrollIntoView({ block: 'center', inline: 'center' })
+          await raf()
+          // Only now does the floating element (and its arrow) come into
+          // existence — the page is already scrolled underneath it.
+          const styles = buildAnchorStyles(anchorName, { placement, offset: 16, flip: false })
+          const float = document.createElement('div')
+          float.className = 'float'
+          float.textContent = placement
+          const arrow = document.createElement('div')
+          arrow.className = 'arrow'
+          arrow.style.width = '12px'
+          arrow.style.height = '12px'
+          Object.assign(float.style, styles.floating)
+          Object.assign(arrow.style, styles.arrow)
+          float.append(arrow)
+          wrap.append(float)
+          await settle(null)
+          const { fails } = await checkArrow({ placement, size: 12, btn, float, arrow }, false)
+          arrowLateResults.push({ name: `${placement}, mounted at scrollY=${Math.round(window.scrollY)}`, ok: fails.length === 0, fails })
+          wrap.style.display = 'none'
+        }
+        await raf()
+
         // --- containing-block traps: ancestor declarations that capture a
         // `position: fixed` floating element. The gap must survive all of them
         // (`anchor()` resolves correctly no matter which box it measures from),
@@ -281,17 +439,32 @@
             float.style.inset = 'auto'
           }
 
-          const { anchor, floating } = buildAnchorStyles(anchorName, {
+          const styles = buildAnchorStyles(anchorName, {
             placement: 'bottom',
             offset: 8,
             flip: false,
           })
-          Object.assign(btn.style, anchor)
-          Object.assign(float.style, floating)
+          Object.assign(btn.style, styles.anchor)
+          Object.assign(float.style, styles.floating)
+
+          // Only on the top-layer pairs: inside a trap Safari resolves an
+          // `anchor()` naming anything but the element's own `position-anchor`
+          // against the wrong origin, and the arrow measures off the floating
+          // box. The top layer is the documented fix for traps — this asserts
+          // it fixes the arrow too, not just the floating element.
+          let arrow = null
+          if (topLayer) {
+            arrow = document.createElement('div')
+            arrow.className = 'arrow'
+            arrow.style.width = '12px'
+            arrow.style.height = '12px'
+            Object.assign(arrow.style, styles.arrow)
+            float.append(arrow)
+          }
 
           wrap.append(btn, float)
           root.append(wrap)
-          return { wrap, btn, float }
+          return { wrap, btn, float, arrow }
         }
 
         const trapPairs = TRAPS.map((trap, i) => ({ trap, ...buildTrapPair(trap, i, false) }))
@@ -303,10 +476,6 @@
         const trapSpacer = document.createElement('div')
         trapSpacer.style.height = '1200px'
         root.append(trapSpacer)
-        // The safe-area floats are `position: fixed` too, so once we scroll
-        // past them the browser clamps them into view — right on top of the
-        // boxes we're about to hit-test. They're measured; take them out.
-        for (const { float } of safePairs) float.style.display = 'none'
         await raf()
 
         /** Is the floating box actually painted where it was placed? */
@@ -353,7 +522,7 @@
         // The fix: the same traps, with the floating element in the top layer.
         // Nothing should be clipped and everything should still be centered.
         const topLayerResults = []
-        for (const { trap, btn, float } of topLayerPairs) {
+        for (const { trap, btn, float, arrow } of topLayerPairs) {
           btn.scrollIntoView({ block: 'center', inline: 'center' })
           float.showPopover()
           await settle(null)
@@ -368,6 +537,16 @@
           const clippedBy = hitTest(float)
           if (clippedBy) fails.push(`clipped even in the top layer (hit ${clippedBy})`)
 
+          // The arrow rides along: centred on the surface's facing edge, still
+          // pointing at the anchor, still painted on top.
+          const r = arrow.getBoundingClientRect()
+          const arrowMain = (r.top + r.bottom) / 2
+          if (Math.abs(arrowMain - f.top) > T) fails.push(`arrow off the facing edge (Δ=${(arrowMain - f.top).toFixed(1)})`)
+          const arrowDx = (r.left + r.right) / 2 - (a.left + a.right) / 2
+          if (Math.abs(arrowDx) > T) fails.push(`arrow not centred on the anchor (Δ=${arrowDx.toFixed(1)})`)
+          const tipHit = document.elementFromPoint((r.left + r.right) / 2, arrowMain - 3)
+          if (tipHit !== arrow) fails.push(`arrow tip not on top (got ${tipHit ? tipHit.className || tipHit.tagName : 'null'})`)
+
           float.hidePopover()
           topLayerResults.push({ name: trap.name, ok: fails.length === 0, fails })
         }
@@ -381,6 +560,16 @@
             results: safeResults,
             passed: safeResults.filter((r) => r.ok).length,
             total: safeResults.length,
+          },
+          arrow: {
+            results: arrowResults,
+            passed: arrowResults.filter((r) => r.ok).length,
+            total: arrowResults.length,
+          },
+          arrowMountedScrolled: {
+            results: arrowLateResults,
+            passed: arrowLateResults.filter((r) => r.ok).length,
+            total: arrowLateResults.length,
           },
           containingBlockTraps: {
             results: trapResults,

@@ -38,11 +38,14 @@ const { anchor, floating, arrow } = buildAnchorStyles('--menu', {
 const MIGRATION_CODE = `# Codemod rewrites the mechanical 80% of a floating-ui setup.
 npx css-anchor-kit migrate src/`
 
-const POPOVER_KIT_CODE = `import { Popover, PopoverTrigger, PopoverContent } from 'css-anchor-kit'
+const POPOVER_KIT_CODE = `import { Popover, PopoverTrigger, PopoverContent, Arrow, useAnchored } from 'css-anchor-kit'
 
-<Popover placement="bottom-start" offset={10}>
+// boundary="viewport" flips in JS, so the arrow follows the card across —
+// and useAnchored() reports the side it landed on, for the arrow's own CSS.
+<Popover placement="bottom-start" offset={10} boundary="viewport">
   <PopoverTrigger className="btn">Open</PopoverTrigger>
   <PopoverContent className="card">
+    <Arrow className={\`arrow \${useAnchored().placement.startsWith('top') ? 'arrow-down' : 'arrow-up'}\`} />
     Click outside or press Esc — the browser closes it.
   </PopoverContent>
 </Popover>
@@ -92,6 +95,10 @@ function Hero() {
   const { anchorProps, floatingProps, arrowProps } = useAnchor({
     placement: 'bottom',
     offset: 10,
+    // No flip, so this stays 100% CSS: a native flip never reports back, and the
+    // arrow — positioned off the anchor — would stay put while the badge moved.
+    // Where flipping matters, `boundary: 'viewport'` flips in JS instead.
+    flip: false,
   })
   return (
     <header className="hero" id="top">
@@ -123,12 +130,10 @@ function Hero() {
           ⌘ Live demo — hover me
         </button>
         {tip && (
-          <>
+          <div {...floatingProps} className="tooltip hero-tip">
             <div {...arrowProps} className="arrow arrow-up" aria-hidden />
-            <div {...floatingProps} className="tooltip hero-tip">
-              this badge is positioned by css-anchor-kit ✨
-            </div>
-          </>
+            this badge is positioned by css-anchor-kit ✨
+          </div>
         )}
       </div>
 
@@ -340,9 +345,9 @@ export function App() {
                   </tr>
                   <tr>
                     <td><code>boundary</code></td>
-                    <td><code>Element | RefObject</code></td>
+                    <td><code>Element | RefObject | 'viewport'</code></td>
                     <td><code>—</code></td>
-                    <td>opt-in JS flip inside a scroll frame</td>
+                    <td>opt-in JS flip — inside a scroll frame, or against the viewport so an arrow can follow it</td>
                   </tr>
                 </tbody>
               </table>
@@ -364,7 +369,7 @@ export function App() {
                 <tbody>
                   <tr><td><code>anchorProps</code></td><td>the reference element</td><td>sets <code>anchor-name</code></td></tr>
                   <tr><td><code>floatingProps</code></td><td>the positioned element</td><td>sets <code>position</code> + insets</td></tr>
-                  <tr><td><code>arrowProps</code></td><td>an optional arrow</td><td>omit it for no arrow</td></tr>
+                  <tr><td><code>arrowProps</code></td><td>an optional arrow, <em>inside</em> the floating element</td><td>omit it for no arrow</td></tr>
                   <tr><td><code>safeAreaProps</code></td><td>a child of the floating element</td><td>the hover corridor; needs <code>safeArea</code> (see <a href="#safe-area">Safe area</a>)</td></tr>
                   <tr><td><code>placement</code></td><td>—</td><td>the placement in effect (a <code>boundary</code> may have flipped it)</td></tr>
                   <tr><td><code>anchorName</code></td><td>—</td><td>the generated dashed-ident, for manual CSS</td></tr>

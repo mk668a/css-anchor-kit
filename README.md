@@ -43,7 +43,7 @@ floating-ui is ~28M weekly downloads of JavaScript whose core job — *keep this
 | Position computed by | JS, on every scroll/resize | the browser's layout engine |
 | Runtime cost | measure → place → `autoUpdate` loop | **none** (it's CSS) |
 | Bundle (min+gzip) | ~6–10 KB core + React | **< 1 KB**, React optional |
-| Arrow tracks anchor when shifted | needs JS middleware | a sibling anchored to the same element |
+| Arrow stays on the anchor when the box is edge-aligned | needs JS middleware | a child of the floating element, positioned by `anchor()` |
 | Hover survives the gap | `safePolygon()` — a cursor-tracked triangle, one `pointermove` listener | a rect the browser positions between the two boxes |
 | Works without React | yes | yes — [`buildAnchorStyles`](#vanilla--non-react) |
 
@@ -68,6 +68,7 @@ const { anchorProps, floatingProps, arrowProps, safeAreaProps, anchorName, suppo
   size:      false,     // match the anchor's size: 'width' | 'height' | true, default false
   strategy:  'fixed',   // 'fixed' | 'absolute', default 'fixed'
   safeArea:  false,     // hoverable corridor across the offset gap, default false
+  boundary:  null,      // opt-in JS flip: a scroll container, or 'viewport'
 })
 ```
 
@@ -77,7 +78,7 @@ Returns:
 |---|---|---|
 | `anchorProps` | `{ style }` | spread on the reference element |
 | `floatingProps` | `{ style }` | spread on the floating element |
-| `arrowProps` | `{ style }` | spread on an optional arrow element (a **sibling** of the floating one) |
+| `arrowProps` | `{ style }` | spread on an optional arrow element — a **child** of the floating one |
 | `safeAreaProps` | `{ style }` | spread on an optional [safe area](#safe-area-the-safepolygon-problem) (a **child** of the floating one) |
 | `anchorName` | `string` | the generated `--cak-*` dashed-ident (for hand-written CSS) |
 | `supported` | `boolean` | `false` during SSR + first paint, then reflects browser support |
@@ -177,17 +178,65 @@ If the Popover API is missing (older browsers, or before hydration), the compone
 
 ### Arrow
 
-The arrow is a sibling element anchored to the **same** anchor, so it stays centered on the anchor even when the floating box is edge-aligned or flips — no JS middleware:
+Render the arrow **inside** the floating element. Give it a size and a background; the kit centres its box on whichever edge faces the anchor, so exactly half of it pokes out:
 
 ```tsx
 const { anchorProps, floatingProps, arrowProps } = useAnchor({ placement: 'top', offset: 8 })
 return (
   <>
     <button {...anchorProps}>Menu</button>
-    <div {...floatingProps} className="popover">…</div>
-    <div {...arrowProps} className="arrow" />
+    <div {...floatingProps} className="popover">
+      <div {...arrowProps} className="arrow" aria-hidden />
+      …
+    </div>
   </>
 )
+```
+
+```css
+.arrow {
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  /* The kit centres the *box* on the edge, so the triangle takes the outer half
+     of it: base on the edge, tip pointing at the anchor. */
+  clip-path: polygon(50% 0, 100% 50%, 0 50%);   /* pointing up */
+}
+```
+
+Three things fall out of that:
+
+- **It stays centred on the anchor** even when the floating box is edge-aligned (`bottom-start` and friends) — that's what the JS `arrow()` middleware is for elsewhere.
+- **It's centred on the edge at any size.** Half the box sits inside the surface and half outside, so nothing hand-tunes a nudge and nothing breaks when you change the arrow's size. A rotated square (`rotate: 45deg`, no `clip-path`) works too — its visible half is the same triangle — but don't tuck either one with `transform`: `transform` composes *after* `rotate`, so a `translateY` on a 45°-rotated square travels diagonally instead of straight. (`translate` is applied *before* `rotate` — use that to slide the arrow along its edge.)
+- **It paints above the surface, not under it** — which is why it's a child and not a sibling. A child paints on top of its parent's background *and* its parent's `box-shadow`; a preceding sibling gets that shadow smeared across it and reads as a dirty grey chip. Being a child also means the arrow rides into the top layer with a `popover` floating element — a sibling out there isn't an acceptable anchor for it at all, and lands thousands of px away.
+
+Reset the popover's UA border. The UA stylesheet gives every `[popover]` `border: solid`, which computes to **3px of `currentColor`** — a near-black ring on a light surface, sitting exactly between the arrow's base (which lands on the border box) and the surface's fill, so an un-reset popover looks like there's a gap between the two. The kit neutralises the UA `inset`/`margin` because those break positioning; `border`, `padding` and `background` are yours to set.
+
+Give the arrow a **flat** background. A gradient is painted relative to each element's own box, so the same `linear-gradient` on a 16px arrow squeezes the whole ramp into 16px and stops matching the surface behind it — and the mismatch slides around as the arrow moves along the edge. `background-attachment: fixed` would give both boxes one shared origin, but the arrow is `position: fixed`, which resolves that against itself. Pick a solid colour from the gradient, or keep gradient surfaces arrowless.
+
+On a surface with a border, carry that outline across the notch the arrow punches in it. A `border` can't do it on a clipped element — the clip cuts the border off — so use a `drop-shadow` of the triangle's own silhouette, nudged 1px away from the surface so only the two sloped edges show it. **Cut the shape on a child, and filter the parent**: `clip-path` is applied *after* `filter`, so a `drop-shadow` on the same box is clipped away with everything else outside the triangle, and you get no outline at all.
+
+```css
+.arrow::before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--surface);
+  clip-path: polygon(50% 0, 100% calc(50% + 1px), 0 calc(50% + 1px));
+}
+.arrow { filter: drop-shadow(0 -1px 0 var(--border)); }   /* pointing up */
+```
+
+(The base runs 1px past the edge on purpose: landing it exactly on the edge leaves both shapes antialiasing the same fractional coordinate, and the hairline neither covers reads as a gap. With a rotated square instead of a clip, put a border on the two edges that stick out — after a 45° rotation the tip is the square's top-left corner, so an up-pointing arrow is outlined by its `border-top` and `border-left`.)
+
+The arrow is pinned to the **anchor**, not to the floating box, so a *native* `flip` moves the box out from under it. Measuring off the floating element instead is the obvious fix and it demos beautifully — but `anchor()` naming a second, `position: fixed` element is resolved against stale coordinates by both engines in cases far more common than a flip (see [limitations](#honest-limitations)), so the kit doesn't.
+
+**If you render an arrow and want flipping, pass `boundary: 'viewport'`.** That takes the same decision CSS would, but in JS, so the hook knows about it — the returned `placement` reports the effective side and every emitted style, arrow included, is rebuilt for it. It costs one throttled scroll/resize listener, and it's the same escape hatch as flipping inside a scroll container:
+
+```tsx
+const { arrowProps, placement } = useAnchor({ placement: 'bottom', offset: 10, boundary: 'viewport' })
+// `placement` is 'top' once the box has flipped — use it to pick the arrow's direction class
 ```
 
 ### Safe area (the `safePolygon` problem)
@@ -240,7 +289,7 @@ const closeSoon = () => { timer.current = setTimeout(() => setOpen(false), 0) }
 
 One rule the CSS enforces on you, and one honest trade-off:
 
-- The safe area is a **child** of the floating element (the arrow is a sibling — this one isn't). A top-layer popover is only an acceptable anchor for something else in the top layer, and only `position: fixed` keeps the corridor's containing block outside the floating box. Both come free by rendering it inside.
+- The safe area is a **child** of the floating element, for the same reasons as [the arrow](#arrow). A top-layer popover is only an acceptable anchor for something else in the top layer, and only `position: fixed` keeps the corridor's containing block outside the floating box. Both come free by rendering it inside.
 - It's a rect, not a shrinking polygon, so it's *more* forgiving than floating-ui's: any path through the corridor keeps the pair alive, not just one aimed at the card. No cursor tracking means no `buffer` and no intent detection, and while the floating element is open the corridor swallows pointer events over whatever sits between the two boxes.
 
 ### Vanilla / non-React
@@ -323,7 +372,7 @@ useEffect(() => {
 | `flip()` middleware | `flip: true` (default) |
 | `hide()` middleware | `hide: true` |
 | `size()` middleware (match width) | `size: 'width'` / `'height'` / `true` |
-| `arrow()` middleware + `ref` | spread `arrowProps` on a sibling |
+| `arrow()` middleware + `ref` | spread `arrowProps` on a child of the floating element |
 | `refs.setReference` / `setFloating` | spread `anchorProps` / `floatingProps` |
 | `autoUpdate(...)` | — not needed, the browser tracks it |
 | `useHover(..., { handleClose: safePolygon() })` | `safeArea: true` + `<SafeArea />` (a rect, not a cursor-tracked polygon) |
@@ -361,10 +410,12 @@ CSS Anchor Positioning is **discrete**, not continuous, so the kit is intentiona
 - **`autoPlacement`** (pick the best of many sides at runtime) isn't mapped; choose a `placement` + `flip`.
 - **An ancestor can still capture the floating element.** `transform`, `contain` and friends move the containing block out from under it — see [containing-block traps](#containing-block-traps). Not a limitation of the kit so much as of `position: fixed`, but it's the failure everyone hits, so the kit detects it and the top layer solves it.
 - **`safePolygon()`'s cursor tracking** can't be reproduced — CSS has no way to read the pointer. [`safeArea`](#safe-area-the-safepolygon-problem) covers the same failure with a static rect over the gap, which is more forgiving but has no `buffer` or intent detection.
+- **The arrow doesn't follow a native `flip`.** It's positioned off the anchor, so when `position-try-fallbacks` throws the floating box to the other side, the arrow stays put. The tempting fix — measure off the floating element, which *does* move — needs an `anchor()` that names a second, `position: fixed` element, and neither engine resolves that reliably: Chrome returns document-space coordinates for anything mounted on an already-scrolled page (a tooltip opening halfway down a page — off by the scroll offset), and Safari misses it inside a [containing-block trap](#containing-block-traps). Pay for it with `boundary: 'viewport'` (JS flip, reports the effective `placement`, one throttled listener) or with `flip: false`, not with a positioning bug.
+- **Safari drifts a `position: fixed` child of an *open top-layer* popover on scroll.** The arrow and the safe area are exactly that. Scroll the page while a `popover` is open and Safari doesn't re-run the anchor scroll adjustment for them, so they slide by the scroll distance while the popover itself stays correctly anchored — a `<Popover>` left open across a scroll ends up with its arrow floating in the gap. Measured: Chrome 152 holds at 0px through any scroll; WebKit 26.5 is off by exactly the scroll delta. The blast radius is only the top layer — a plain `position: fixed` floating element (no `popover` attribute) is exact in both engines at any scroll — and nothing about it is new: v1.3.0's arrow drifts identically. There is no CSS-only way around it: the arrow has to point at the anchor, an `anchor()` needs the containing block to be the viewport to do that, and that is the very thing Safari fails to re-adjust. Until it's fixed, either accept it, or close the popover on scroll in your own code.
 
 Everything else floating-ui is used for in the 90% tooltip/popover/menu case — placement, offset, flip, hide, **size**, arrows, and **RTL/logical alignment** — is covered, natively, with no JS in the scroll path.
 
-> Verified in Chrome 152 by [`examples/verify.html`](./examples/verify.html), a geometry harness that asserts real `getBoundingClientRect()` values: all 12 placements position correctly (right side, ~8px gap, logical `-start`/`-end` alignment), `size` matches the anchor, `flip` kicks in on overflow, the [safe area](#safe-area-the-safepolygon-problem) fills the gap exactly — and is hit-testable — on all four sides, and all 13 [containing-block traps](#containing-block-traps) behave as documented (both the browser's outcome and the detector's prediction). Open it at a viewport of at least 1400×800; it needs the room to scroll each pair into the middle of the screen.
+> Verified in **Chrome 152 and Safari 26 (WebKit 26.5)** by [`examples/verify.html`](./examples/verify.html), a geometry harness that asserts real `getBoundingClientRect()` values: all 12 placements position correctly (right side, ~8px gap, logical `-start`/`-end` alignment), `size` matches the anchor, `flip` kicks in on overflow, the [safe area](#safe-area-the-safepolygon-problem) fills the gap exactly — and is hit-testable — on all four sides, the [arrow](#arrow) sits centred on the surface's facing edge at every placement and at any arrow size, stays centred on the anchor, and is painted above the surface — including when it is mounted on an already-scrolled page, which is where a stale `anchor()` shows up — and all 13 [containing-block traps](#containing-block-traps) behave as documented (both the browser's outcome and the detector's prediction), before and after the top layer fixes them. Open it at a viewport of at least 1400×900; it needs the room to scroll each pair into the middle of the screen.
 
 ## Roadmap
 

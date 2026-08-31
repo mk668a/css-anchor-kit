@@ -40,7 +40,7 @@ const UNSUPPORTED_MIDDLEWARE: Record<string, string> = {
   size: 'size() is not wired into the hook yet — use anchor-size() in raw CSS (v0.2)',
   autoPlacement: 'autoPlacement() has no native equivalent',
   inline: 'inline() has no native equivalent',
-  arrow: "arrow() — spread `arrowProps` on a sibling element instead of passing an arrow ref",
+  arrow: "arrow() — spread `arrowProps` on a child of the floating element instead of passing an arrow ref",
 }
 
 const TODO = (msg: string) => ` TODO(css-anchor-kit): ${msg}`

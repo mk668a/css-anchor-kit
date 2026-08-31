@@ -316,10 +316,17 @@ a {
   overflow: hidden;
 }
 
+/* A row, not a column: stacked triggers put the next trigger exactly where the
+   open card lands, so the card buries it and the arrow ends up pointing at a
+   button it has nothing to do with. Side by side, each card opens into empty
+   space. */
 .preview-stage {
-  min-height: 200px;
-  display: grid;
-  place-items: center;
+  min-height: 260px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem 1.5rem;
   padding: 2rem;
 }
 
@@ -340,11 +347,17 @@ a {
   outline-offset: 2px;
 }
 
+/* `border: none` is not decoration. The UA stylesheet gives every `[popover]`
+   `border: solid`, which computes to 3px of *currentColor* — a near-black ring
+   on a light surface. It also lands between the arrow's base (which sits on the
+   border box) and the surface's fill, so an un-reset popover looks like it has
+   a gap between the two. */
 .tooltip,
 .card,
 .menu {
   background: #f3f5fb;
   color: #11141c;
+  border: none;
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
 }
 
@@ -355,29 +368,66 @@ a {
   max-width: 26ch;
 }
 
+/* Render the arrow *inside* the floating element: a child paints above its
+   parent's background and box-shadow, where a preceding sibling would be dimmed
+   by that shadow and have the parent's border drawn straight across its base. */
+/* An actual triangle, cut out with `clip-path` rather than faked with a rotated
+   square. The kit centres the arrow's *box* on the surface's facing edge, so the
+   triangle takes the outer half of that box: its base lands on the edge and its
+   tip points at the anchor. 16px box → 16 wide × 8 tall, which fits inside a
+   10px `offset` without running into the anchor.
+
+   The shape is cut out of a **pseudo-element**, not the arrow itself: `clip-path`
+   is applied *after* `filter`, so a `drop-shadow` used to outline the triangle on
+   a bordered surface would be clipped away with everything else outside the
+   shape. Clipping the child and filtering the parent keeps the outline.
+
+   Each class names the direction the arrow points. The base runs 1px *past* the
+   edge, into the surface: landing it exactly on the edge leaves both shapes
+   antialiasing the same fractional coordinate, and the hairline neither covers
+   reads as a gap. The overlap is over the surface's own fill, so it's invisible. */
 .arrow {
-  width: 12px;
-  height: 12px;
-  background: #f3f5fb;
-  rotate: 45deg;
-  border-radius: 2px;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  /* The arrow is polymorphic — inside a <ul> it renders as an <li>, so reset
+     what a list item would otherwise inherit from the menu's own item styles. */
+  padding: 0;
+  list-style: none;
 }
 
-/* The kit places the arrow at the floating element's facing edge (it tracks the
-   offset). Nudge it a few px back toward the anchor so a clean triangle pokes
-   out; the floating element renders later in the DOM and hides the tucked half.
-   The direction is the side that faces the anchor, so it's offset-independent. */
-.arrow-down {
-  transform: translateY(6px);
+.arrow::before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--arrow-bg, #f3f5fb);
+  clip-path: var(--arrow-shape);
 }
 
 .arrow-up {
-  transform: translateY(-6px);
+  --arrow-shape: polygon(50% 0, 100% calc(50% + 1px), 0 calc(50% + 1px));
+}
+
+.arrow-down {
+  --arrow-shape: polygon(0 calc(50% - 1px), 100% calc(50% - 1px), 50% 100%);
+}
+
+.arrow-left {
+  --arrow-shape: polygon(0 50%, calc(50% + 1px) 0, calc(50% + 1px) 100%);
+}
+
+.arrow-right {
+  --arrow-shape: polygon(calc(50% - 1px) 0, 100% 50%, calc(50% - 1px) 100%);
 }
 
 .card {
   display: grid;
   gap: 0.25rem;
+  /* `[popover]` is `width: fit-content`, so without a cap this copy stretches
+     the card across the viewport. Kept close to the trigger's own width too, or
+     a `-start`-aligned card leaves its arrow stranded near one end. */
+  max-width: 22ch;
   padding: 0.8rem 1.1rem;
   border-radius: 0.5rem;
   text-align: center;
@@ -415,13 +465,13 @@ a {
   font-size: 0.9rem;
 }
 
-.menu li {
+.menu li:not(.arrow) {
   padding: 0.45rem 0.75rem;
   border-radius: 0.4rem;
   cursor: default;
 }
 
-.menu li:hover {
+.menu li:not(.arrow):hover {
   background: #dde3f3;
 }
 
@@ -651,8 +701,16 @@ a {
   --on: #e7e9ee;
 }
 
+/* A gradient is painted relative to *each element's own box*, so a 12px arrow
+   would squeeze the whole ramp into 12px and stop matching the card behind it —
+   and the mismatch would slide around as you move the arrow along the edge.
+   CSS has no reliable way to continue one box's gradient into another
+   (`background-attachment: fixed` gets both to share the viewport as origin,
+   but a `position: fixed` element — which the arrow always is — resolves it
+   against itself instead). So the brand surface is a flat colour: whatever the
+   surface is, the arrow can be exactly it. */
 .style-demo.brand {
-  --surface: linear-gradient(100deg, var(--accent), var(--accent-2));
+  --surface: #7b6cff;
   --on: #0a0b10;
 }
 
@@ -662,9 +720,10 @@ a {
   font-weight: 550;
 }
 
-.style-demo .arrow {
-  background: var(--surface);
+.style-demo {
+  --arrow-bg: var(--surface);
 }
+
 
 /* ---------- wide anchor + size panel ---------- */
 .btn-wide {
@@ -759,13 +818,6 @@ a {
   white-space: nowrap;
 }
 
-.arrow-left {
-  transform: translateX(6px);
-}
-
-.arrow-right {
-  transform: translateX(-6px);
-}
 
 .ctrl-hint {
   margin: -0.2rem 0 0;
@@ -794,21 +846,40 @@ a {
   min-width: 140px;
 }
 
-.cmp-menu li {
+.cmp-menu li:not(.arrow) {
   padding: 0.4rem 0.7rem;
   border-radius: 0.35rem;
   color: var(--text);
   cursor: pointer;
 }
 
-.cmp-menu li:hover {
+.cmp-menu li:not(.arrow):hover {
   background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
-/* Match the arrow to the menu surface (the default arrow is light). */
-.cmp-stage .arrow {
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
+/* Match the arrow to the menu surface (the default arrow is light) and let it
+   carry the menu's border across the notch it punches in that outline. A
+   `border` can't do that on a clipped element — the clip cuts it off — so the
+   outline is a `drop-shadow` of the triangle's own silhouette, nudged away from
+   the surface by 1px so only the two sloped edges show it. */
+.cmp-stage {
+  --arrow-bg: var(--bg-elev);
+}
+
+.cmp-stage .arrow-up {
+  filter: drop-shadow(0 -1px 0 var(--border));
+}
+
+.cmp-stage .arrow-down {
+  filter: drop-shadow(0 1px 0 var(--border));
+}
+
+.cmp-stage .arrow-left {
+  filter: drop-shadow(-1px 0 0 var(--border));
+}
+
+.cmp-stage .arrow-right {
+  filter: drop-shadow(1px 0 0 var(--border));
 }
 
 /* ---------- flip inside an iframe ---------- */

@@ -89,11 +89,16 @@ describe('buildAnchorStyles', () => {
     expect(arrow.margin).toBe('0')
   })
 
-  it('applies the same offset to the arrow so it tracks the floating edge', () => {
-    expect(buildAnchorStyles(NAME, { placement: 'top', offset: 8 }).arrow.marginBottom).toBe('8px')
-    expect(buildAnchorStyles(NAME, { placement: 'bottom', offset: 8 }).arrow.marginTop).toBe('8px')
-    expect(buildAnchorStyles(NAME, { placement: 'right', offset: 12 }).arrow.marginLeft).toBe('12px')
-    expect(buildAnchorStyles(NAME, { placement: 'left', offset: 12 }).arrow.marginRight).toBe('12px')
+  it('never puts the offset on the arrow — it rides the floating edge instead', () => {
+    // The arrow is positioned off the floating box, which already carries the
+    // gap. Re-applying the offset would double it.
+    for (const placement of ['top', 'bottom', 'left', 'right'] as const) {
+      const { arrow } = buildAnchorStyles(NAME, { placement, offset: 12 })
+      expect(arrow.margin).toBe('0')
+      for (const side of ['marginTop', 'marginBottom', 'marginLeft', 'marginRight']) {
+        expect(arrow[side]).toBeUndefined()
+      }
+    }
   })
 
   it('disables flip and toggles hide', () => {
@@ -102,17 +107,60 @@ describe('buildAnchorStyles', () => {
     expect(floating.positionVisibility).toBe('anchors-visible')
   })
 
-  it('honors the absolute strategy', () => {
+  it('honors the absolute strategy — but keeps the arrow fixed', () => {
     const { floating, arrow } = buildAnchorStyles(NAME, { strategy: 'absolute' })
     expect(floating.position).toBe('absolute')
-    expect(arrow.position).toBe('absolute')
+    // An absolutely positioned arrow resolves anchor() against its offset
+    // parent and lands tens of px off; measured in Chrome and WebKit.
+    expect(arrow.position).toBe('fixed')
   })
 
-  it('keeps the arrow centered on the anchor regardless of alignment', () => {
-    const { arrow } = buildAnchorStyles(NAME, { placement: 'bottom-start' })
+  it('centers the arrow on the line the floating edge lands on', () => {
+    const { arrow } = buildAnchorStyles(NAME, { placement: 'bottom-start', offset: 8 })
     expect(arrow.positionAnchor).toBe(NAME)
-    expect(arrow.top).toBe('anchor(bottom)')
-    expect(arrow.justifySelf).toBe('anchor-center')
+    // Both insets name that same line — the sign only flips because `bottom`
+    // measures from the other side of the containing block…
+    expect(arrow.top).toBe(`calc(anchor(${NAME} bottom) + 8px)`)
+    expect(arrow.bottom).toBe(`calc(anchor(${NAME} bottom) - 8px)`)
+    // …so self-alignment centers the box on it, at any arrow size.
+    expect(arrow.alignSelf).toBe('center')
+    // Cross axis stays pinned to the anchor even though the box is edge-aligned.
+    expect(arrow.left).toBe(`anchor(${NAME} center)`)
+    expect(arrow.right).toBe(`anchor(${NAME} center)`)
+    expect(arrow.justifySelf).toBe('center')
+  })
+
+  it('pushes the arrow the other way for a top/left placement', () => {
+    expect(buildAnchorStyles(NAME, { placement: 'top', offset: 8 }).arrow.top)
+      .toBe(`calc(anchor(${NAME} top) - 8px)`)
+    expect(buildAnchorStyles(NAME, { placement: 'top', offset: 8 }).arrow.bottom)
+      .toBe(`calc(anchor(${NAME} top) + 8px)`)
+    expect(buildAnchorStyles(NAME, { placement: 'left', offset: 8 }).arrow.left)
+      .toBe(`calc(anchor(${NAME} left) - 8px)`)
+    expect(buildAnchorStyles(NAME, { placement: 'left', offset: 8 }).arrow.right)
+      .toBe(`calc(anchor(${NAME} left) + 8px)`)
+  })
+
+  it('swaps the arrow axes for an inline-axis placement', () => {
+    const { arrow } = buildAnchorStyles(NAME, { placement: 'right' })
+    expect(arrow.left).toBe(`anchor(${NAME} right)`)
+    expect(arrow.right).toBe(`anchor(${NAME} right)`)
+    expect(arrow.top).toBe(`anchor(${NAME} center)`)
+    expect(arrow.bottom).toBe(`anchor(${NAME} center)`)
+  })
+
+  it('names no anchor but the default one', () => {
+    // Measuring off the floating element would buy flip-tracking, and both
+    // engines resolve that second, `position: fixed` anchor against stale
+    // coordinates in cases far more common than a flip.
+    for (const placement of ['top', 'bottom', 'left', 'right'] as const) {
+      const { arrow } = buildAnchorStyles(NAME, { placement, offset: 10, safeArea: true })
+      for (const value of Object.values(arrow)) {
+        expect(String(value)).not.toContain(`${NAME}-floating`)
+      }
+      expect(arrow.alignSelf).toBe('center')
+      expect(arrow.justifySelf).toBe('center')
+    }
   })
 
   it('emits no safe area (and no floating anchor-name) by default', () => {

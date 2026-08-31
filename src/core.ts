@@ -67,7 +67,12 @@ export interface AnchorStyles {
   anchor: AnchorStyle
   /** Spread onto the floating (positioned) element. */
   floating: AnchorStyle
-  /** Spread onto an optional arrow element (a sibling of the floating element). */
+  /**
+   * Spread onto an optional arrow element. Render it **inside** the floating
+   * element (see {@link buildAnchorStyles}) — outside it the arrow is painted
+   * under the floating element's `box-shadow`, and outside a *top-layer*
+   * floating element it isn't positioned at all.
+   */
   arrow: AnchorStyle
   /**
    * Spread onto an optional safe-area element (a **child** of the floating
@@ -118,6 +123,73 @@ function flipFallbacks(blockAxis: boolean, align: Align): string {
 }
 
 /**
+ * The arrow: a box centred on the floating element's facing edge, so half of it
+ * pokes out of the surface and half hides behind it.
+ *
+ * Both insets on an axis resolve to the same line, which collapses the
+ * inset-modified containing block to zero on that axis, and `align-self` /
+ * `justify-self: center` then centres the box on it. That holds at any arrow
+ * size — nothing here knows how big the arrow is, so nothing breaks when the
+ * consumer changes it, and there is no negative margin to hand-tune.
+ *
+ * - **Main axis** — the anchor's `side` edge, pushed `offset` px outward: the
+ *   same line the floating element's facing edge lands on.
+ * - **Cross axis** — the anchor's centre, so the arrow keeps pointing at the
+ *   anchor even when the floating box is edge-aligned.
+ *
+ * Self-alignment rather than `margin: auto`, because auto margins are only
+ * symmetric on the block axis: an over-constrained inline axis zeroes
+ * `margin-inline-start` and dumps the whole overflow on the end side, sliding
+ * the arrow off its edge by half its width.
+ *
+ * Every value names the **default anchor** and nothing else. Measuring off the
+ * floating element instead would let the arrow follow a native `flip`, and it
+ * type-checks and demos beautifully — but `anchor()` naming a second,
+ * `position: fixed` element is resolved against stale coordinates by Chrome
+ * (off by the scroll offset for anything mounted on an already-scrolled page)
+ * and by Safari (inside a containing-block trap, and while a top-layer popover
+ * is open across a scroll). A tooltip that opens halfway down a page is the
+ * common case; a flip is not. See "Honest limitations" in the README.
+ *
+ * Consumers rotate their arrow themselves. Don't nudge it with `transform`:
+ * `transform` composes *after* `rotate`, so a `translateY` on a 45°-rotated
+ * square travels diagonally. Nothing needs nudging now anyway — and `translate`
+ * (applied before `rotate`) is free for sliding the arrow along its edge.
+ */
+function buildArrow(anchorName: string, side: Side, offset: number, blockAxis: boolean): AnchorStyle {
+  const mainNear = blockAxis ? 'top' : 'left'
+  const mainFar = blockAxis ? 'bottom' : 'right'
+  const crossNear = blockAxis ? 'left' : 'top'
+  const crossFar = blockAxis ? 'right' : 'bottom'
+  const edge = `anchor(${anchorName} ${side})`
+  // `bottom`/`right` measure from the far side of the containing block, so the
+  // same physical line needs the opposite sign there.
+  const outward = side === 'bottom' || side === 'right' ? 1 : -1
+  const line = (towardsFar: boolean) => {
+    if (!offset) return edge
+    return `calc(${edge} ${(towardsFar ? -outward : outward) > 0 ? '+' : '-'} ${offset}px)`
+  }
+  const center = `anchor(${anchorName} center)`
+  return {
+    // Always fixed, never `strategy`. The arrow belongs inside the floating
+    // element, and an absolutely positioned child resolves `anchor()` against
+    // that floating box instead of the viewport — measured tens of px off in
+    // both Chrome and WebKit.
+    position: 'fixed',
+    // Also the *default* anchor, which is what the browser's scroll adjustment
+    // keys off, and the only anchor these values name.
+    positionAnchor: anchorName,
+    margin: '0',
+    [mainNear]: line(false),
+    [mainFar]: line(true),
+    [crossNear]: center,
+    [crossFar]: center,
+    alignSelf: 'center',
+    justifySelf: 'center',
+  }
+}
+
+/**
  * The corridor between the anchor and the floating element: the gap on the
  * placement's own axis, the union of both boxes on the cross axis. Hovering it
  * counts as "still travelling between the two", which is what floating-ui's
@@ -153,14 +225,16 @@ function buildSafeArea(anchorName: string, floatingName: string, blockAxis: bool
 /**
  * Build anchor / floating / arrow / safe-area style objects for a placement.
  *
- * The arrow is a **sibling** of the floating element; the safe area (opt in
- * with `safeArea`) is a **child** of it, because it references both boxes and a
- * top-layer popover is only an acceptable anchor for another element in the top
- * layer.
+ * Render the arrow and the safe area **inside** the floating element. A
+ * top-layer popover is only an acceptable anchor for something else in the top
+ * layer, and being a child puts them there for free. It also settles paint
+ * order: a child paints above its parent's background *and* its parent's
+ * `box-shadow`, where a preceding sibling gets that shadow smeared over it and
+ * reads as a dirty grey chip.
  *
  * @param anchorName a CSS dashed-ident, e.g. `'--cak-tooltip'`. Must be unique
  *   per anchor↔floating pair on the page. When `safeArea` is on, the floating
- *   element is named `${anchorName}-floating` so the safe area can span both.
+ *   element is named `${anchorName}-floating` so the corridor can span both.
  */
 export function buildAnchorStyles(
   anchorName: string,
@@ -194,27 +268,11 @@ export function buildAnchorStyles(
     [mainInset]: anchorEdge,
   }
 
-  // The arrow anchors to the *same* element and stays centered on it, so it keeps
-  // pointing at the anchor even when the floating box flips or is aligned.
-  const arrow: AnchorStyle = {
-    position: strategy,
-    positionAnchor: anchorName,
-    margin: '0',
-    [mainInset]: anchorEdge,
-  }
-
   if (offset) {
-    // Apply the gap to BOTH the floating element and the arrow so the arrow
-    // tracks the floating element's facing edge. Without this the arrow stays
-    // pinned to the anchor and visibly detaches as the offset grows.
-    const marginProp = `margin${capitalize(mainInset)}`
-    floating[marginProp] = `${offset}px`
-    arrow[marginProp] = `${offset}px`
+    floating[`margin${capitalize(mainInset)}`] = `${offset}px`
   }
 
   const selfProp = blockAxis ? 'justifySelf' : 'alignSelf'
-  // Arrow is always centered on the anchor.
-  arrow[selfProp] = 'anchor-center'
 
   if (align === 'center') {
     floating[selfProp] = 'anchor-center'
@@ -244,7 +302,7 @@ export function buildAnchorStyles(
   return {
     anchor,
     floating,
-    arrow,
+    arrow: buildArrow(anchorName, side, offset, blockAxis),
     safeArea: safeArea ? buildSafeArea(anchorName, floatingName, blockAxis) : { display: 'none' },
   }
 }

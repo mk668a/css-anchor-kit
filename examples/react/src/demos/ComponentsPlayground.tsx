@@ -11,18 +11,18 @@ const PLACEMENTS: Placement[] = [
 type SizeOpt = 'none' | 'width'
 
 function genCode(o: { placement: Placement; size: SizeOpt; arrow: boolean }): string {
-  const attrs = [`placement="${o.placement}"`, 'offset={6}']
+  const attrs = [`placement="${o.placement}"`, 'offset={10}', 'flip={false}']
   if (o.size === 'width') attrs.push('size="width"')
-  const arrowLine = o.arrow ? '\n  <Arrow className="arrow arrow-up" />' : ''
+  const arrowLine = o.arrow ? '\n    <Arrow as="li" className="arrow arrow-up" />' : ''
   return `import { Anchored, Anchor, Floating${o.arrow ? ', Arrow' : ''} } from 'css-anchor-kit'
 
 <Anchored ${attrs.join(' ')}>
   <Anchor as="button" popoverTarget="menu">Open menu ▾</Anchor>
-  <Floating as="ul" id="menu" popover="auto">
+  <Floating as="ul" id="menu" popover="auto">${arrowLine}
     <li>Profile</li>
     <li>Settings</li>
     <li>Sign out</li>
-  </Floating>${arrowLine}
+  </Floating>
 </Anchored>`
 }
 
@@ -37,9 +37,11 @@ export function ComponentsPlayground() {
   const [open, setOpen] = useState(true)
 
   const side = placement.split('-')[0]
+  // Named for the direction the arrow points, i.e. the side opposite the
+  // placement — that's what decides which two of its edges stick out.
   const arrowClass =
     side === 'top' ? 'arrow-down' : side === 'bottom' ? 'arrow-up'
-    : side === 'left' ? 'arrow-left' : 'arrow-right'
+    : side === 'left' ? 'arrow-right' : 'arrow-left'
 
   return (
     <div className="pg">
@@ -77,19 +79,28 @@ export function ComponentsPlayground() {
       <div className="pg-canvas">
         <div className="scroll-area cmp-stage">
           <div className="scroll-inner" style={{ width: 'auto', height: 'auto' }}>
-            <Anchored placement={placement} offset={6} size={size === 'width' ? 'width' : false}>
+            {/* flip is off so the chosen placement is what you actually see. A
+                native flip is invisible to JS, so the arrow's outline classes —
+                which say which two edges of the diamond stick out — would keep
+                pointing the old way even though the arrow itself follows the
+                menu across. */}
+            <Anchored
+              placement={placement}
+              offset={10}
+              flip={false}
+              size={size === 'width' ? 'width' : false}
+            >
               <Anchor as="button" className="btn" onClick={() => setOpen((v) => !v)}>
                 Open menu ▾
               </Anchor>
               {open && (
-                <>
-                  {arrow && <Arrow className={`arrow ${arrowClass}`} aria-hidden />}
-                  <Floating as="ul" className="cmp-menu">
-                    <li>Profile</li>
-                    <li>Settings</li>
-                    <li>Sign out</li>
-                  </Floating>
-                </>
+                <Floating as="ul" className="cmp-menu">
+                  {/* `as="li"` keeps the markup valid inside a <ul>. */}
+                  {arrow && <Arrow as="li" className={`arrow ${arrowClass}`} aria-hidden />}
+                  <li>Profile</li>
+                  <li>Settings</li>
+                  <li>Sign out</li>
+                </Floating>
               )}
             </Anchored>
           </div>

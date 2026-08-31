@@ -21,11 +21,13 @@ const SIZE_MAP: Record<SizeOpt, AnchorOptions['size']> = {
   both: true,
 }
 
+/** Keyed by placement side, valued by the direction the arrow ends up pointing
+ *  — which is the opposite side, and what the styling hooks care about. */
 const ARROW_CLASS: Record<string, string> = {
   top: 'arrow-down',
   bottom: 'arrow-up',
-  left: 'arrow-left',
-  right: 'arrow-right',
+  left: 'arrow-right',
+  right: 'arrow-left',
 }
 
 function genCode(o: {
@@ -56,15 +58,17 @@ function genCode(o: {
     ? ` style={{ translate: '${o.blockAxis ? `${o.arrowShift}px 0` : `0 ${o.arrowShift}px`}' }}`
     : ''
   const arrowLine = o.showArrow
-    ? `\n  <div {...arrowProps}${slide} className="arrow" />`
+    ? `\n    <div {...arrowProps}${slide} className="arrow" />`
     : ''
   return `const { ${destruct} } = useAnchor({
   ${opts.join(',\n  ')},
 })
 
 <>
-  <button {...anchorProps}>anchor</button>${arrowLine}
-  <div {...floatingProps}>floating</div>
+  <button {...anchorProps}>anchor</button>
+  <div {...floatingProps}>${arrowLine}
+    floating
+  </div>
 </>`
 }
 
@@ -113,13 +117,19 @@ export function InteractivePlayground() {
   const liveSide = effPlacement.split('-')[0]
   const liveBlockAxis = liveSide === 'top' || liveSide === 'bottom'
   // Slide the arrow along the anchor's edge. Uses the `translate` property (not
-  // `transform`) so it composes cleanly with the arrow's 45° rotate + tuck.
-  const arrowSlide = liveBlockAxis
-    ? `${arrowShift}px 0`
-    : `0 ${arrowShift}px`
+  // `transform`): `translate` is applied *before* `rotate`, so it stays
+  // axis-aligned, while a `transform` composes after the 45° rotation and would
+  // travel diagonally.
+  // Sliding the arrow past the end of the edge it sits on just detaches it, and
+  // that edge is the card's width on one axis and its (much smaller) height on
+  // the other — so the control is bounded by whichever edge is in play.
+  const shiftMax = liveBlockAxis ? 24 : 10
+  const shift = Math.max(-shiftMax, Math.min(shiftMax, arrowShift))
+  const arrowSlide = liveBlockAxis ? `${shift}px 0` : `0 ${shift}px`
   const reqSide = placement.split('-')[0]
   const code = genCode({
-    placement, offset, flip, boundaryFlip, hide, size, strategy, showArrow, arrowShift,
+    placement, offset, flip, boundaryFlip, hide, size, strategy, showArrow,
+    arrowShift: shift,
     blockAxis: reqSide === 'top' || reqSide === 'bottom',
   })
 
@@ -174,8 +184,8 @@ export function InteractivePlayground() {
 
         {showArrow && (
           <label>
-            arrow shift · {arrowShift}px
-            <input type="range" min={-24} max={24} value={arrowShift}
+            arrow shift · {shift}px
+            <input type="range" min={-shiftMax} max={shiftMax} value={shift}
               onChange={(e) => setArrowShift(Number(e.target.value))} />
           </label>
         )}
@@ -211,15 +221,15 @@ export function InteractivePlayground() {
             <button {...anchorProps} className="btn">
               anchor
             </button>
-            {showArrow && (
-              <div
-                {...arrowProps}
-                className={`arrow ${ARROW_CLASS[liveSide]}`}
-                style={{ ...arrowProps.style, translate: arrowSlide }}
-                aria-hidden
-              />
-            )}
             <div {...floatingProps} className="pg-card">
+              {showArrow && (
+                <div
+                  {...arrowProps}
+                  className={`arrow ${ARROW_CLASS[liveSide]}`}
+                  style={{ ...arrowProps.style, translate: arrowSlide }}
+                  aria-hidden
+                />
+              )}
               floating
             </div>
           </div>

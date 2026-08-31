@@ -9,8 +9,11 @@ import {
 import { resolveFlip } from './flipWithin'
 import { warnContainingBlockTrap } from './containingBlock'
 
-/** A scroll container to flip within: the element itself, or a ref to it. */
-export type Boundary = Element | RefObject<Element | null> | null
+/**
+ * What to flip within: a scroll container (the element itself, or a ref to it),
+ * or the string `'viewport'` to flip against the viewport in JS.
+ */
+export type Boundary = Element | RefObject<Element | null> | 'viewport' | null
 
 /**
  * A ref callback to spread onto a host element. Intentionally loose (`any` node)
@@ -21,16 +24,24 @@ export type AnchorRef = (node: any) => void
 
 export interface UseAnchorOptions extends AnchorOptions {
   /**
-   * **Opt-in:** flip inside this scroll container instead of the viewport.
+   * **Opt-in:** flip in JS instead of leaving it to `position-try-fallbacks`.
    *
-   * Native CSS `flip` (`position-try-fallbacks`) is judged against the viewport
-   * and ignores inner scroll containers — so a floating element won't flip as a
-   * scrollable panel scrolls. Pass that panel (or a ref to it) here and the hook
-   * adds a small scroll/resize listener that swaps the placement as the anchor
-   * nears the boundary's edge. Spread the returned `ref` onto the anchor and
-   * floating elements for the measurement to work.
+   * Pass a **scroll container** (or a ref to it) to flip within *that* box.
+   * Native CSS `flip` is judged against the viewport and ignores inner scroll
+   * containers, so a floating element won't otherwise flip as a scrollable panel
+   * scrolls. The hook adds a small scroll/resize listener that swaps the
+   * placement as the anchor nears the boundary's edge.
    *
-   * Leave it unset for the default: 100% CSS, zero positioning JS.
+   * Pass `'viewport'` to flip against the viewport — the same decision CSS would
+   * make, but taken in JS, so the hook *knows* about it: the returned
+   * `placement` reports the effective side and `arrowProps` moves with the
+   * floating element. Use it when you render an arrow **and** want flipping; a
+   * CSS flip is invisible to JS, so the arrow would otherwise stay on the side
+   * you asked for while the floating box moves to the other one.
+   *
+   * Either way, spread the returned `ref` onto the anchor and floating elements
+   * for the measurement to work. Leave it unset for the default: 100% CSS, zero
+   * positioning JS.
    */
   boundary?: Boundary
 }
@@ -40,7 +51,13 @@ export interface UseAnchorReturn {
   anchorProps: { style: CSSProperties; ref: AnchorRef }
   /** Spread onto the floating element: `<div {...floatingProps} role="tooltip" />`. */
   floatingProps: { style: CSSProperties; ref: AnchorRef }
-  /** Spread onto an optional arrow element (sibling of the floating element). */
+  /**
+   * Spread onto an optional arrow element — render it **inside** the floating
+   * element. It centers itself on the edge that faces the anchor, at whatever
+   * size you give it; shape it, but don't nudge it. A *native* flip moves the
+   * floating box out from under it — pass `boundary: 'viewport'` to flip in JS
+   * instead, which the arrow does follow.
+   */
   arrowProps: { style: CSSProperties }
   /**
    * Spread onto an optional safe-area element — a **child** of the floating
@@ -66,10 +83,16 @@ export interface UseAnchorReturn {
 
 const sanitize = (id: string) => id.replace(/[^a-zA-Z0-9-]/g, '')
 
-function resolveBoundary(boundary: Boundary | undefined): Element | null {
+function resolveBoundary(boundary: Boundary | undefined): Element | 'viewport' | null {
   if (!boundary) return null
+  if (boundary === 'viewport') return 'viewport'
   if (typeof Element !== 'undefined' && boundary instanceof Element) return boundary
   return (boundary as RefObject<Element | null>).current ?? null
+}
+
+/** The viewport in `getBoundingClientRect` coordinates: it starts at the origin. */
+function viewportRect() {
+  return { top: 0, left: 0, right: window.innerWidth, bottom: window.innerHeight }
 }
 
 /**
@@ -137,8 +160,11 @@ export function useAnchor(options: UseAnchorOptions = {}): UseAnchorReturn {
   // Boundary-scoped flip: measure on scroll/resize, swap placement when the
   // preferred side overflows the container and the opposite side has room.
   useEffect(() => {
-    const boundaryEl = resolveBoundary(boundary)
-    if (!boundaryEl || flip === false) return
+    const resolved = resolveBoundary(boundary)
+    if (!resolved || flip === false) return
+    // `'viewport'` has no element to observe — the window listeners below cover
+    // every way it can change.
+    const boundaryEl = resolved === 'viewport' ? null : resolved
 
     let raf = 0
     const measure = () => {
@@ -151,7 +177,7 @@ export function useAnchor(options: UseAnchorOptions = {}): UseAnchorReturn {
         requested,
         a.getBoundingClientRect(),
         { width: fr.width, height: fr.height },
-        boundaryEl.getBoundingClientRect(),
+        boundaryEl ? boundaryEl.getBoundingClientRect() : viewportRect(),
         offset ?? 0,
       )
       setEffPlacement((prev) => (prev === next ? prev : next))
@@ -161,19 +187,19 @@ export function useAnchor(options: UseAnchorOptions = {}): UseAnchorReturn {
     }
 
     schedule()
-    boundaryEl.addEventListener('scroll', schedule, { passive: true })
+    boundaryEl?.addEventListener('scroll', schedule, { passive: true })
     window.addEventListener('scroll', schedule, { passive: true, capture: true })
     window.addEventListener('resize', schedule)
     const ro =
       typeof ResizeObserver !== 'undefined' ? new ResizeObserver(schedule) : null
     if (ro) {
-      ro.observe(boundaryEl)
+      if (boundaryEl) ro.observe(boundaryEl)
       if (floatingElRef.current) ro.observe(floatingElRef.current)
     }
 
     return () => {
       if (raf) cancelAnimationFrame(raf)
-      boundaryEl.removeEventListener('scroll', schedule)
+      boundaryEl?.removeEventListener('scroll', schedule)
       window.removeEventListener('scroll', schedule, { capture: true })
       window.removeEventListener('resize', schedule)
       ro?.disconnect()

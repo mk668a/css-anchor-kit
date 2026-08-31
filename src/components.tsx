@@ -127,7 +127,7 @@ function slot(
 export const Anchor = slot('anchorProps', 'Anchor')
 /** The positioned element. Spreads `floatingProps`. */
 export const Floating = slot('floatingProps', 'Floating')
-/** An optional arrow (a sibling of the floating element). Spreads `arrowProps`. */
+/** An optional arrow. Render it **inside** `<Floating>`. Spreads `arrowProps`. */
 export const Arrow = slot('arrowProps', 'Arrow')
 /**
  * The hover corridor between anchor and floating element — floating-ui's

@@ -26,12 +26,10 @@ export function TooltipDemo() {
       </button>
 
       {open && (
-        <>
+        <div {...floatingProps} role="tooltip" className="tooltip">
           <div {...arrowProps} className="arrow arrow-down" aria-hidden />
-          <div {...floatingProps} role="tooltip" className="tooltip">
-            Positioned natively — zero JS reflow.
-          </div>
-        </>
+          Positioned natively — zero JS reflow.
+        </div>
       )}
     </div>
   )
