@@ -44,6 +44,44 @@ describe('useAnchor', () => {
     expect(renderHook(() => useAnchor()).result.current.supported).toBe(true)
     vi.unstubAllGlobals()
   })
+
+  describe('containing-block warning', () => {
+    /** Render an anchor + floating pair inside a wrapper and mount the hook. */
+    function mount(trapped: boolean, strategy?: 'fixed' | 'absolute') {
+      vi.stubGlobal('getComputedStyle', () => ({
+        getPropertyValue: (p: string) =>
+          trapped && p === 'transform' ? 'matrix(1, 0, 0, 1, 0, 0)' : '',
+      }))
+      renderHook(() => {
+        const { anchorProps, floatingProps } = useAnchor({ strategy })
+        anchorProps.ref(document.body.appendChild(document.createElement('button')))
+        floatingProps.ref(document.body.appendChild(document.createElement('div')))
+      })
+      vi.unstubAllGlobals()
+    }
+
+    it('warns when the anchor sits inside a transformed ancestor', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      mount(true)
+      expect(warn).toHaveBeenCalledOnce()
+      expect(warn.mock.calls[0][0]).toContain('[css-anchor-kit]')
+      warn.mockRestore()
+    })
+
+    it('stays quiet on a clean ancestor chain', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      mount(false)
+      expect(warn).not.toHaveBeenCalled()
+      warn.mockRestore()
+    })
+
+    it('stays quiet for `strategy: absolute`, where the trap is the point', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      mount(true, 'absolute')
+      expect(warn).not.toHaveBeenCalled()
+      warn.mockRestore()
+    })
+  })
 })
 
 describe('isAnchorPositioningSupported', () => {

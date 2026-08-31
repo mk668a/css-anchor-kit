@@ -15,12 +15,21 @@
         background: #cde; border: 1px solid #36c;
         padding: 6px 10px; width: 60px; box-sizing: border-box;
       }
+      /* Containing-block traps: in-flow panels wide enough that a 160px
+         floating box centered on the anchor must stick out of them. */
+      .trap {
+        width: 200px; height: 40px; margin: 40px 0 0 240px;
+        background: #eee; box-sizing: border-box; padding: 4px;
+      }
+      .trap button { position: static; width: 60px; height: 24px; }
+      .trap .float { width: 160px; }
     </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module">
       import { buildAnchorStyles, isAnchorPositioningSupported } from '../dist/core.js'
+      import { findContainingBlockTrap } from '../dist/containingBlock.js'
 
       const PLACEMENTS = [
         'top', 'top-start', 'top-end',
@@ -229,6 +238,140 @@
           safeResults.push({ placement, ok: fails.length === 0, fails })
         }
 
+        // --- containing-block traps: ancestor declarations that capture a
+        // `position: fixed` floating element. The gap must survive all of them
+        // (`anchor()` resolves correctly no matter which box it measures from),
+        // but a capturing ancestor that also clips makes the floating element
+        // vanish — which is what `findContainingBlockTrap` is there to predict.
+        const TRAPS = [
+          { name: 'transform', css: 'transform: translateZ(0)', property: 'transform', clips: false },
+          { name: 'filter', css: 'filter: blur(0px)', property: 'filter', clips: false },
+          { name: 'will-change', css: 'will-change: transform', property: 'will-change', clips: false },
+          { name: 'backdrop-filter', css: 'backdrop-filter: blur(1px)', property: 'backdrop-filter', clips: false },
+          { name: 'contain:layout', css: 'contain: layout', property: 'contain', clips: false },
+          { name: 'contain:paint', css: 'contain: paint', property: 'contain', clips: true },
+          { name: 'contain:strict', css: 'contain: strict', property: 'contain', clips: true },
+          { name: 'contain:content', css: 'contain: content', property: 'contain', clips: true },
+          { name: 'content-visibility', css: 'content-visibility: auto; contain-intrinsic-size: 200px 40px', property: 'content-visibility', clips: true },
+          { name: 'transform+overflow', css: 'transform: translateZ(0); overflow: hidden', property: 'transform', clips: true },
+          // Not a trap, despite reading like one: no `container-type` value and
+          // no size/style-only containment moves the containing block.
+          { name: 'container-type', css: 'container-type: inline-size', property: null, clips: false },
+          { name: 'contain:size style', css: 'contain: size style; height: 40px', property: null, clips: false },
+          { name: 'overflow:hidden', css: 'overflow: hidden', property: null, clips: false },
+        ]
+
+        function buildTrapPair(trap, i, topLayer) {
+          const wrap = document.createElement('div')
+          wrap.className = 'trap'
+          wrap.style.cssText += ';' + trap.css
+
+          const anchorName = `--cak-t${topLayer ? 'p' : ''}${i}`
+          const btn = document.createElement('button')
+          btn.className = 'anchor'
+          btn.textContent = trap.name
+
+          const float = document.createElement('div')
+          float.className = 'float'
+          float.textContent = trap.name
+          if (topLayer) {
+            float.setAttribute('popover', 'manual')
+            // Same neutralization PopoverContent applies: the UA stylesheet's
+            // `inset: 0` would otherwise outrank the kit's anchor() insets.
+            float.style.inset = 'auto'
+          }
+
+          const { anchor, floating } = buildAnchorStyles(anchorName, {
+            placement: 'bottom',
+            offset: 8,
+            flip: false,
+          })
+          Object.assign(btn.style, anchor)
+          Object.assign(float.style, floating)
+
+          wrap.append(btn, float)
+          root.append(wrap)
+          return { wrap, btn, float }
+        }
+
+        const trapPairs = TRAPS.map((trap, i) => ({ trap, ...buildTrapPair(trap, i, false) }))
+        const topLayerPairs = TRAPS.map((trap, i) => ({ trap, ...buildTrapPair(trap, i, true) }))
+        for (const { wrap } of topLayerPairs) wrap.style.display = 'none'
+        // Room below the last panel, or `scrollIntoView({ block: 'center' })`
+        // can't centre it and its floating box falls past the viewport edge,
+        // where `elementFromPoint` reports nothing and the hit test is a lie.
+        const trapSpacer = document.createElement('div')
+        trapSpacer.style.height = '1200px'
+        root.append(trapSpacer)
+        // The safe-area floats are `position: fixed` too, so once we scroll
+        // past them the browser clamps them into view — right on top of the
+        // boxes we're about to hit-test. They're measured; take them out.
+        for (const { float } of safePairs) float.style.display = 'none'
+        await raf()
+
+        /** Is the floating box actually painted where it was placed? */
+        const hitTest = (float) => {
+          const f = float.getBoundingClientRect()
+          const hit = document.elementFromPoint(f.left + f.width / 2, f.top + f.height / 2)
+          return hit === float ? null : hit ? hit.className || hit.tagName : 'nothing'
+        }
+
+        const trapResults = []
+        for (const { trap, btn, float } of trapPairs) {
+          btn.scrollIntoView({ block: 'center', inline: 'center' })
+          await settle(float)
+          const a = btn.getBoundingClientRect()
+          const f = float.getBoundingClientRect()
+          const fails = []
+
+          // 1. `anchor()` itself is never the casualty: the gap holds in every
+          //    containing block.
+          const gap = f.top - a.bottom
+          if (Math.abs(gap - 8) > T) fails.push(`gap=${gap.toFixed(1)} expected ~8`)
+
+          // 2. The documented visual outcome.
+          const clippedBy = hitTest(float)
+          if (trap.clips && !clippedBy) fails.push('expected to be clipped away, but it is visible')
+          if (!trap.clips && clippedBy) fails.push(`unexpectedly clipped (hit ${clippedBy})`)
+
+          // 3. …and the runtime detector agrees with the browser.
+          const detected = findContainingBlockTrap(btn)
+          if ((detected?.property ?? null) !== trap.property) {
+            fails.push(`detector said ${detected?.property ?? 'no trap'}, expected ${trap.property ?? 'no trap'}`)
+          }
+          if ((detected?.clips ?? false) !== trap.clips) {
+            fails.push(`detector clips=${detected?.clips ?? false}, expected ${trap.clips}`)
+          }
+
+          trapResults.push({ name: trap.name, ok: fails.length === 0, fails })
+        }
+
+        for (const { wrap } of trapPairs) wrap.style.display = 'none'
+        for (const { wrap } of topLayerPairs) wrap.style.display = ''
+        await raf()
+
+        // The fix: the same traps, with the floating element in the top layer.
+        // Nothing should be clipped and everything should still be centered.
+        const topLayerResults = []
+        for (const { trap, btn, float } of topLayerPairs) {
+          btn.scrollIntoView({ block: 'center', inline: 'center' })
+          float.showPopover()
+          await settle(null)
+          const a = btn.getBoundingClientRect()
+          const f = float.getBoundingClientRect()
+          const fails = []
+
+          const gap = f.top - a.bottom
+          if (Math.abs(gap - 8) > T) fails.push(`gap=${gap.toFixed(1)} expected ~8`)
+          const dx = (f.left + f.right) / 2 - (a.left + a.right) / 2
+          if (Math.abs(dx) > T) fails.push(`not centered (Δ=${dx.toFixed(1)})`)
+          const clippedBy = hitTest(float)
+          if (clippedBy) fails.push(`clipped even in the top layer (hit ${clippedBy})`)
+
+          float.hidePopover()
+          topLayerResults.push({ name: trap.name, ok: fails.length === 0, fails })
+        }
+
         window.__verify = {
           supported: isAnchorPositioningSupported(),
           results,
@@ -238,6 +381,16 @@
             results: safeResults,
             passed: safeResults.filter((r) => r.ok).length,
             total: safeResults.length,
+          },
+          containingBlockTraps: {
+            results: trapResults,
+            passed: trapResults.filter((r) => r.ok).length,
+            total: trapResults.length,
+          },
+          topLayerEscapes: {
+            results: topLayerResults,
+            passed: topLayerResults.filter((r) => r.ok).length,
+            total: topLayerResults.length,
           },
         }
         window.__verifyDone = true

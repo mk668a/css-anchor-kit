@@ -41,6 +41,11 @@
       "types": "./dist/core.d.ts",
       "import": "./dist/core.js",
       "require": "./dist/core.cjs"
+    },
+    "./containing-block": {
+      "types": "./dist/containingBlock.d.ts",
+      "import": "./dist/containingBlock.js",
+      "require": "./dist/containingBlock.cjs"
     }
   },
   "scripts": {

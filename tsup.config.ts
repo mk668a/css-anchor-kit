@@ -3,7 +3,7 @@ import { defineConfig } from 'tsup'
 export default defineConfig([
   // Library: the runtime bundle. Stays zero-dep + tiny; React external.
   {
-    entry: ['src/index.ts', 'src/core.ts'],
+    entry: ['src/index.ts', 'src/core.ts', 'src/containingBlock.ts'],
     format: ['esm', 'cjs'],
     dts: true,
     clean: true,

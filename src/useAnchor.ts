@@ -7,6 +7,7 @@ import {
   type Placement,
 } from './core'
 import { resolveFlip } from './flipWithin'
+import { warnContainingBlockTrap } from './containingBlock'
 
 /** A scroll container to flip within: the element itself, or a ref to it. */
 export type Boundary = Element | RefObject<Element | null> | null
@@ -184,6 +185,27 @@ export function useAnchor(options: UseAnchorOptions = {}): UseAnchorReturn {
   useEffect(() => {
     setSupported(isAnchorPositioningSupported())
   }, [])
+
+  // Dev-only: the anchor's ancestors decide whether a `position: fixed`
+  // floating element can leave its panel at all. Say so once, at mount, with
+  // the offending element — the alternative is bisecting someone else's CSS.
+  //
+  // `process.env.NODE_ENV` is written bare, the way every bundler's `define`
+  // expects it: a `typeof process` guard would read as dynamic and pin the
+  // whole diagnostic (~1 KB of message strings) into production bundles. The
+  // try/catch is that guard instead — it survives a raw `<script type=module>`
+  // where `process` doesn't exist, and folds away with the branch.
+  useEffect(() => {
+    try {
+      if (process.env.NODE_ENV !== 'production' && strategy !== 'absolute') {
+        warnContainingBlockTrap(anchorElRef.current, floatingElRef.current)
+      }
+    } catch {
+      // No `process` binding at all (a bundler-less `<script type="module">`).
+      // Stay silent rather than throw; call warnContainingBlockTrap() yourself
+      // if you want the diagnostic there.
+    }
+  }, [strategy])
 
   return {
     anchorProps: { style: styles.anchor as CSSProperties, ref: setAnchorEl },

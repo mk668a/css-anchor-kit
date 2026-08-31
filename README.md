@@ -253,6 +253,56 @@ Object.assign(anchorEl.style, anchor)
 Object.assign(floatingEl.style, floating)
 ```
 
+## Containing-block traps
+
+The one thing that breaks native anchor positioning isn't `anchor()` — it's *where `anchor()` measures from*. A floating element is `position: fixed`, so its containing block is normally the viewport. A handful of ancestor declarations capture fixed descendants and become the containing block instead, and the floating element is stuck inside that ancestor's box:
+
+- **Clamping** — `flip` and `anchor-center` are resolved against that box instead of the viewport, so a centered tooltip stops being centered the moment it would stick out.
+- **Clipping** — if the same ancestor also clips, the floating element is cut away and looks like it never rendered. This is the one that costs an afternoon: nothing errors, the element is in the DOM, its rect is correct, and you see nothing.
+
+Measured in Chrome 152 by [`examples/verify.html`](./examples/verify.html):
+
+| ancestor declaration | captures `fixed` | also clips |
+|---|---|---|
+| `transform` / `translate` / `rotate` / `scale` / `perspective` | yes | no |
+| `filter` / `backdrop-filter` | yes | no |
+| `will-change: transform \| filter \| perspective \| contain` | yes | no |
+| `contain: layout` | yes | no |
+| `contain: paint` / `strict` / `content` | yes | **yes** |
+| `content-visibility: auto \| hidden` | yes | **yes** |
+| any of the above **+ `overflow` other than `visible`** | yes | **yes** |
+| `overflow: hidden` on its own | no | no |
+| `container-type` (any value), `contain: size \| style \| inline-size` | no | no |
+
+The last row is worth knowing: a query container reads like a trap and isn't one. `overflow: hidden` alone isn't one either — a fixed element whose containing block is the viewport isn't the scroller's descendant to clip.
+
+### The fix: the top layer
+
+`<Popover>` / `<Tooltip>` / `<Menu>` put the panel in the **top layer**, which leaves the ancestor chain entirely. All 13 cases above pass with the panel in the top layer — same 8px gap, still centered, never clipped. If you're rendering a floating element inside an editor, a virtualized list, a `contain`ed card, or anything with a transform on it, [use those components](#popover-tooltip-menu--the-interaction-half) rather than `useAnchor` + your own visibility toggle.
+
+### The kit tells you
+
+`useAnchor` walks the anchor's ancestors once, on mount, and warns when it finds a trap — with the offending element attached so devtools can highlight it:
+
+```
+[css-anchor-kit] The anchor is inside an ancestor with `contain: paint`, which becomes the
+containing block for `position: fixed` — it also clips (contain: paint), so the floating
+element is cut away and looks like it never rendered.
+Fix: render the floating element in the top layer — use <Popover>/<Tooltip>/<Menu>, or add
+the `popover` attribute and call showPopover().
+```
+
+The check is behind a bare `process.env.NODE_ENV`, so bundlers fold the branch away and tree-shake the whole diagnostic — about 1 KB of message strings that never reaches a production build (verified with esbuild's `define`). It also stays quiet when the floating element is already in the top layer, and when you asked for `strategy: 'absolute'` — there, binding to an ancestor is the point.
+
+The same walk is exported if you want it in a test or a vanilla setup — React not required:
+
+```ts
+import { findContainingBlockTrap } from 'css-anchor-kit/containing-block'
+
+const trap = findContainingBlockTrap(buttonEl)
+// → { element, property: 'contain', value: 'paint', clips: true, clipReason: 'contain: paint' } | null
+```
+
 ## Browser support & polyfill
 
 Detect support with the `supported` flag (or `isAnchorPositioningSupported()`), and load the [`@oddbird/css-anchor-positioning`](https://github.com/oddbird/css-anchor-positioning) polyfill for older browsers — it's **BYO and not bundled**, so supporting browsers ship nothing extra:
@@ -309,11 +359,12 @@ CSS Anchor Positioning is **discrete**, not continuous, so the kit is intentiona
 
 - **`shift`** (continuously *sliding* a popover pixel-by-pixel to stay in view) has **no native equivalent** — the platform's fallback model is discrete (try position A, then B, …), not continuous. `flip` covers the common overflow case natively; if you genuinely need continuous shifting, floating-ui is still the right tool.
 - **`autoPlacement`** (pick the best of many sides at runtime) isn't mapped; choose a `placement` + `flip`.
+- **An ancestor can still capture the floating element.** `transform`, `contain` and friends move the containing block out from under it — see [containing-block traps](#containing-block-traps). Not a limitation of the kit so much as of `position: fixed`, but it's the failure everyone hits, so the kit detects it and the top layer solves it.
 - **`safePolygon()`'s cursor tracking** can't be reproduced — CSS has no way to read the pointer. [`safeArea`](#safe-area-the-safepolygon-problem) covers the same failure with a static rect over the gap, which is more forgiving but has no `buffer` or intent detection.
 
 Everything else floating-ui is used for in the 90% tooltip/popover/menu case — placement, offset, flip, hide, **size**, arrows, and **RTL/logical alignment** — is covered, natively, with no JS in the scroll path.
 
-> Verified in Chrome 152 by [`examples/verify.html`](./examples/verify.html), a geometry harness that asserts real `getBoundingClientRect()` values: all 12 placements position correctly (right side, ~8px gap, logical `-start`/`-end` alignment), `size` matches the anchor, `flip` kicks in on overflow, and the [safe area](#safe-area-the-safepolygon-problem) fills the gap exactly — and is hit-testable — on all four sides.
+> Verified in Chrome 152 by [`examples/verify.html`](./examples/verify.html), a geometry harness that asserts real `getBoundingClientRect()` values: all 12 placements position correctly (right side, ~8px gap, logical `-start`/`-end` alignment), `size` matches the anchor, `flip` kicks in on overflow, the [safe area](#safe-area-the-safepolygon-problem) fills the gap exactly — and is hit-testable — on all four sides, and all 13 [containing-block traps](#containing-block-traps) behave as documented (both the browser's outcome and the detector's prediction). Open it at a viewport of at least 1400×800; it needs the room to scroll each pair into the middle of the screen.
 
 ## Roadmap
 
@@ -323,6 +374,7 @@ Everything else floating-ui is used for in the 90% tooltip/popover/menu case —
 - [x] `npx css-anchor-kit migrate` codemod (floating-ui → css-anchor-kit)
 - [x] `<Popover>` / `<Tooltip>` / `<Menu>` on the native Popover API (top layer, light dismiss — no portal JS)
 - [x] `safeArea` — floating-ui's `safePolygon()` as a pure-CSS hover corridor
+- [x] [containing-block trap](#containing-block-traps) detection — a dev-time warning, and `findContainingBlockTrap()` for your own tests
 - [ ] discrete `shift` approximation via generated `@position-try` fallback positions (exploration; continuous shift is not expressible in pure CSS)
 
 ## License

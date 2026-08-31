@@ -1,6 +1,9 @@
 export { useAnchor } from './useAnchor'
 export type { UseAnchorReturn, UseAnchorOptions, Boundary } from './useAnchor'
 
+export { findContainingBlockTrap, warnContainingBlockTrap } from './containingBlock'
+export type { ContainingBlockTrap, ReadStyle, StyleReader } from './containingBlock'
+
 export { resolveFlip, oppositePlacement } from './flipWithin'
 export type { Rect, Size } from './flipWithin'
 
